@@ -172,7 +172,7 @@ Suppose an attacker can read everything the enclave holds or receives: the openi
 - only balance conservation still rests on the trust placed in the enclave's key;
 - a leaked enclave key can create money for the attacker's own states, but cannot take money from anyone.
 
-Section 11 lists the ways to close the gap.
+Section 12 lists the ways to close the gap.
 
 ## 10. What the bank learns
 
