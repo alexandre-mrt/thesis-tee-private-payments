@@ -10,6 +10,8 @@
 | [4. State and ownership](#4-state-and-the-chain-of-ownership) | [8. Crashes](#8-when-the-enclave-crashes) | [12. Possible solutions for balance](#12-possible-solutions-for-balance-integrity) |
 | [Overview map](#overview-map) | [Appendix A: messages](#appendix-a-messages) | [Appendix B: notation](#appendix-b-notation) |
 
+**How to read this diagram.** The system's main use is a payment, and this diagram shows one from start to end: Alice pays `v` to Bob. Time runs from top to bottom, and the numbered arrows are the messages, in order. Blue means encrypted to the attested enclave. The boxes list the checks each party runs, tagged by what they rest on: **bank** for a check the bank does itself, **enclave key** for a check that relies on the enclave's signing key. Section 5 explains each step.
+
 ![Round 1 payment](maps/payment.png)
 
 The [payment map](maps/payment.pdf) and the [overview map](maps/overview.pdf) are also available as PDF.
@@ -92,6 +94,8 @@ To the bank, two keys from one chain are unrelated. The enclave sees one link pe
 ## 5. A payment
 
 Alice pays `v` to Bob. As in Platypus, only the recipient talks to the system: Bob alone contacts the enclave and the bank.
+
+To see the diagram in full screen, open it in [Mermaid Live](https://mermaid.live/view#pako:eNptVFFvmzAQ_isnXko0qrVppUnRFgk6nlJNk_aKFB1wBCtgM9skiqr-950NLJT0CePv7r7vPp_9FhSqpGADgaG_PcmCfgo8aGwzCYC9VbJvc9Lur0NtRSE6lBZiQANxIwqCsMML6dUyInERicoHnG7w1OGpLBo80RLb-VyUxyXw6oDffc7E0KiDg5P77TbdAFpLxkJYaTI1SMWNeMr0nvFkwtEKJSF0LUNLaHpNLUkbwZBW1CglNXCki0_-pSyBOpEGrtBpYilk4GWf3MEPeFFtmO8T-AKnCLrjPsn69cM3jEBPy9WkL96Adu46gWNw5MusOHum7CMnZxU1FUcDtqZ52Pdcf93mvWhKJya-iomBideP61FRfFU0Llc-1YiDNNDCWdgaDMcNu4SNgZqJVUdSyANY5ZlnrjiB8WCoqioODR1N5FVEwHXdjytE5VTl1sglfTI7RhZuNUqDhWv0WpI_bFmuOGOsayD083dnwFjRNCPtgo5Lpo-ukfQZhASlS9IRKEl8IFVvsIFKaUB5gQpFw-PgrSCNhsxnzU_jxHPQN_bT9q-nO-p2h0zDoPve0TLP1POO_SBrG75HQ81FA4wnvoHk2bFafWH5Z8nI_1Imui0_johmo71phrTg441G8_2epDO4iSLjKHcs5pWn3F0uUw87Q6-DvhLCrH94Kp58r-OSJ_jDjBckOjsLXLFYPb4TmrAcPO1mFziIIGhJtyhK9wi9ZQFHtJTxTxaUVCFbkgXvLsy9Rn8usmDI6p54p-9Klj8-WOP2-z-Hi5VE), or use the [payment map (PDF)](maps/payment.pdf).
 
 ```mermaid
 sequenceDiagram
