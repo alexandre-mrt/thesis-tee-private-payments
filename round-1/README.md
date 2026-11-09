@@ -70,11 +70,11 @@ Each user keeps one secret seed, which **never leaves the device**. The `i`-th s
 
 ```mermaid
 flowchart LR
-  seed["seed<br/>(stays on the device)"] -. derives .-> k0["sk₀, pk₀"]
-  seed -. derives .-> k1["sk₁, pk₁"]
-  seed -. derives .-> k2["sk₂, pk₂"]
-  C0["state C₀<br/>holds pk₀<br/>signed by the bank"] -- "payment signed with sk₀<br/>reveals serial pk₀" --> C1["state C₁<br/>holds pk₁<br/>signed by the bank"]
-  C1 -- "payment signed with sk₁<br/>reveals serial pk₁" --> C2["state C₂<br/>holds pk₂"]
+  seed["seed<br/>(never leaves the device)"] -. derives .-> k0["sk₀, pk₀, r₀"]
+  seed -. derives .-> k1["sk₁, pk₁, r₁"]
+  seed -. derives .-> k2["sk₂, pk₂, r₂"]
+  C0["C₀ = Com(0, pk₀, r₀)<br/>enrolled, signed by the bank"] -- "payment signed with sk₀<br/>reveals serial pk₀" --> C1["C₁ = Com(b₁, pk₁, r₁)<br/>signed by the bank"]
+  C1 -- "payment signed with sk₁<br/>reveals serial pk₁" --> C2["C₂ = Com(b₂, pk₂, r₂)<br/>signed by the bank"]
   k0 -.-> C0
   k1 -.-> C1
   k2 -.-> C2
@@ -103,18 +103,19 @@ sequenceDiagram
   participant L as Public log
   B->>E: attest (fresh nonce)
   E-->>B: attestation (code measurement, fresh channel key)
-  B->>A: request (v, Bob's serial, Bob's new commitment) + attestation
-  Note over A: checks the attestation<br/>builds her new state<br/>signs the transaction with her one-time key
-  A->>B: offer (her serial, her new commitment, her signature, her sealed opening)
-  Note over B: signs the same transaction with his one-time key
-  B->>E: v, transaction, both signatures, both openings (Alice's still sealed)
-  Note over E: checks both states, signatures and balances
-  E-->>B: signed result (2 spent serials, 2 new commitments, 2 owner signatures)
-  B->>K: settle
-  Note over K: checks the enclave and both owner signatures<br/>burns both serials, signs both new states
+  Note over B: prepares C_B' = Com(b_B + v, pk_B⁺, r_B⁺)
+  B->>A: request (v, pk_B, C_B') + attestation
+  Note over A: checks the attestation<br/>builds C_A' = Com(b_A − v, pk_A⁺, r_A⁺)<br/>signs m with sk_A<br/>seals her opening to the channel key
+  A->>B: offer (pk_A, C_A', sig_A, sealed opening)
+  Note over B: signs m with sk_B
+  B->>E: v, transaction, sig_A, sig_B, both openings (Alice's still sealed)
+  Note over E: E1 to E4 in order, one refusal for any failure<br/>erases the channel key
+  E-->>B: result (pk_A, C_A', sig_A, pk_B, C_B', sig_B) + enclave signature
+  B->>K: settle (result)
+  Note over K: B1 to B4: retry, owner signatures, enclave signature<br/>burns both serials, signs both new states
   K->>L: publish
-  K-->>B: bank signatures on both new states
-  B->>A: receipt (Alice's new signature), or Alice reads the public log
+  K-->>B: settled (σ_A', σ_B')
+  B->>A: receipt (σ_A'), or Alice reads the public log
 ```
 
 1. **Request.** Bob attests the enclave with a fresh nonce and gets a channel key used for this payment only. He prepares his new state `C_B' = Com(b_B + v, pk_B⁺, r_B⁺)` and sends Alice the amount, his current serial `pk_B`, `C_B'` and the attestation. Alice never contacts the bank's machine.
