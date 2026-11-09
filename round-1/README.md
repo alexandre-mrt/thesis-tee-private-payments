@@ -10,7 +10,7 @@
 | [4. State and ownership](#4-state-and-the-chain-of-ownership) | [8. Crashes](#8-when-the-enclave-crashes) | [12. Possible solutions for balance](#12-possible-solutions-for-balance-integrity) |
 | [Overview map](#overview-map) | [Appendix A: messages](#appendix-a-messages) | [Appendix B: notation](#appendix-b-notation) |
 
-**How to read this diagram.** The system's main use is a payment, and this diagram shows one from start to end: Alice pays `v` to Bob. Time runs from top to bottom, and the numbered arrows are the messages, in order. Blue means encrypted to the attested enclave. The boxes list the checks each party runs, tagged by what they rest on: **bank** for a check the bank does itself, **enclave key** for a check that relies on the enclave's signing key. Section 5 explains each step.
+**TL;DR:** this diagram captures the main idea: one payment from Alice to Bob, checked by the enclave and settled by the bank.
 
 ![Round 1 payment](maps/payment.png)
 
