@@ -46,7 +46,7 @@
 \node[anchor=north west,align=left] at (0,20.2) {{\bfseries\Large\color{ink} Round 1: overview}\\[2pt]{\small Platypus with one TEE call in place of the two zero-knowledge proofs}\\{\small Serials are one-time public keys: no secret that can spend a user's funds reaches the enclave}};
 \node[anchor=north east,align=left,font=\xs,draw=grey,rounded corners=2pt,inner sep=4pt] at (28.6,20.2) {
 \hd{Parties.} {\color{untrusted}\textbf{red}} untrusted \quad {\color{trust}\textbf{green}} runs attested code, may crash \quad {\color{curious}\textbf{orange}} trusted for integrity, curious about privacy\\
-\hd{Guarantees.} \bk{} rests on a check the bank does itself \quad \ek{} rests on the secrecy of the enclave's signing key\\
+\hd{Guarantees.} \bk{} rests on a check the bank does itself \quad \ek{} rests on the secrecy of the enclave's signing key \quad enclave memory: privacy rests on it\\
 {\color{chan}\textbf{blue}} sealed to the attested enclave};
 
 \draw[draw=untrusted,fill=softred,rounded corners=4pt,line width=1.1pt] (0,18.3) rectangle (7.2,9.6);
@@ -60,7 +60,7 @@
 each builds its new state $C'$ with its next key and blind\\
 both sign the transaction $m=H(\text{``pay''}, pk_A, C_A', pk_B, C_B')$\\
 Alice seals her opening to the enclave so Bob cannot read it\\
-Bob sends the enclave the transaction, both signatures and\\
+Bob sends the enclave $v$, the transaction, both signatures and\\
 \hspace*{0.8em}both openings, then settles the result with the bank\\
 Alice finishes with Bob's receipt or the public log};
 \node[store,font=\xs,text width=6.75cm,fill=softred!25] at (0.12,12.0) {\hd{Chain of ownership}\\[2pt]
@@ -69,11 +69,11 @@ Every next key sits in a state the bank signed only after\\
 checking the previous key's signature: only the seed's\\
 owner can spend the chain, and no identity is involved};
 
-\fill[softblue!70] (7.75,9.6) rectangle (8.95,18.3);
-\node[rotate=90,font=\sm,text=chan,align=center] at (8.35,12.6) {\hd{Anonymous network}\\hides the sender};
+\fill[grey!12] (7.75,9.6) rectangle (8.95,18.3);
+\node[rotate=90,font=\sm,text=grey,align=center] at (8.35,12.6) {\hd{Anonymous network}\\hides the sender};
 
 \draw[draw=untrusted,fill=softred!60,rounded corners=4pt,line width=1.1pt] (9.5,18.3) rectangle (16.4,10.55);
-\node[anchor=north west,align=left,text width=6.7cm,inner sep=3pt,font=\sm] at (9.55,18.25) {\hd{\color{untrusted}Bank's machine}: relays bytes, sees only ciphertext and timing};
+\node[anchor=north west,align=left,text width=6.7cm,inner sep=3pt,font=\sm] at (9.55,18.25) {\hd{\color{untrusted}Bank's machine}: relays encrypted requests; also sees attestations, results and timing};
 \draw[draw=trust,fill=softgreen,rounded corners=4pt,line width=1.1pt] (9.7,17.4) rectangle (16.2,10.75);
 \node[anchor=north west,align=left,text width=6.3cm,inner sep=3pt,font=\xs] at (9.75,17.35) {{\sm\hd{\color{trust}Enclave}} (attested code, run by the bank)\\[2pt]
 Runs the attested code correctly; may crash;\\
@@ -86,7 +86,7 @@ attested and registered by the bank at each boot;\\
 \hd{Checks a payment}\\
 \hspace*{0.8em}E1 openings contain $pk_A$, $pk_B$; bank signatures valid \ek{}\\
 \hspace*{0.8em}E2 new states open to $b_A-v$ and $b_B+v$ \ek{}\\
-\hspace*{0.8em}E3 both owner signatures on $m$\\
+\hspace*{0.8em}E3 both owner signatures on $m$ \bk{}\\
 \hspace*{0.8em}E4 $0<v\le b_A$, \ $b_B+v\le B_{\max}$ \ek{}\\
 \hspace*{0.8em}in this order; one refusal for any failure\\[3pt]
 \hd{Sees}: the openings of both states\\
@@ -99,21 +99,22 @@ registered enclaves (attested signing keys)\\
 spent serials\\
 the stored answer to every settled request\\
 its own state, used to issue and redeem\\[2pt]
-\hd{Not in it}: balances, amounts, identities};
+\hd{Not in it}: users' balances, amounts of payments between users, identities};
 \node[store,font=\xs,text width=5.4cm] at (23.0,16.85) {\hd{Checks a settlement}\\[2pt]
-B1 same $m$ already settled: stored answer \bk{}\\
-B2 recompute $m$; Alice's signature under $pk_A$, Bob's under $pk_B$ \bk{}\\
+B1 recompute $m$; already settled: stored answer \bk{}\\
+B2 Alice's signature under $pk_A$, Bob's under $pk_B$ \bk{}\\
 B3 result signed by a registered enclave \ek{}\\
 B4 two different, unspent serials; burn both, sign both new states, publish \bk{}};
-\node[store,font=\xs,text width=11.05cm,fill=softblue!60] at (17.3,13.95) {\hd{Public transaction log} (as in Platypus; anyone can read or mirror it)\\[2pt]
-per settlement: two spent serials, two new commitments, the owners' and the enclave's signatures, the bank's signatures\\
+\node[store,font=\xs,text width=11.05cm,fill=grey!10] at (17.3,13.95) {\hd{Public transaction log} (as in Platypus, but keeps every entry; anyone can read or mirror it)\\[2pt]
+per settled payment or refresh: the spent serials, two new commitments, the owners' and the enclave's signatures, the bank's signatures\\
 used to finish a payment without a receipt and to recover a wallet from its seed; holds nothing the bank does not already see};
 \node[store,font=\xs,text width=11.05cm,fill=white] at (17.3,12.0) {\hd{What the bank learns}\\[2pt]
 \setlength{\tabcolsep}{3pt}\begin{tabular}{@{}p{1.6cm}p{5.0cm}p{4.0cm}@{}}
 \textbf{Operation} & \textbf{Sees} & \textbf{Never sees}\\
 Payment & two spent serials (and which one paid), two new commitments, three signatures, time & who, the amount, balances, the next serials\\
 Refresh & one spent serial, one new commitment, time & who, the balance\\
-Enroll & one new commitment, time & who, the first serial
+Enroll & one new commitment, time & who, the first serial\\
+Issue, redeem & its own side, the amount, the user's serial & the user's balance
 \end{tabular}};
 
 \draw[sarr] (7.2,16.6) -- (9.7,16.6) node[albl,text=chan,pos=0.5,above=1pt]{encrypted requests};
@@ -132,7 +133,7 @@ A payment cannot be redirected or changed & both owners sign the exact new state
 No double spend & spent serials (B4) & \bk{} & \textbf{holds}\\\hline
 Nobody can burn another user's state & burning a serial needs its owner's signature & \bk{} & \textbf{holds}\\\hline
 \rowcolor{softred!60}\textbf{Balance}: no money is created & checked only by the enclave (E1, E2, E4), trusted through its signature (B3) & \ek{} & \textbf{fails}: the attacker signs results for states that never existed, with any balance, and can redeem them; it still cannot take anyone's existing state\\\hline
-\rowcolor{softred!60}Privacy toward the bank & the enclave opens states, the bank sees only serials and commitments & enclave & \textbf{fails} for the payments in progress: amounts, balances, and links to each participant's previous and next payment; payments completed before the read stay private\\\hline
+\rowcolor{softred!60}Privacy toward the bank & the enclave opens states, the bank sees only serials and commitments & enclave memory & \textbf{fails} for the requests read: amounts, balances, and links to each participant's previous and next payment; requests not read stay private\\\hline
 \end{tabular}};
 
 \node[anchor=north west,font=\xs,text=grey,align=left] at (0,3.4) {Integrity is not yet fully decoupled from the TEE: ownership is enforced by the bank, balance conservation still rests on the enclave's key.\\Next step: let the bank check conservation without seeing values (zero-knowledge proofs as in Platypus, additive commitments with range proofs with or without TEE batching, or per-result attestation).};

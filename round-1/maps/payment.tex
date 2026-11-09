@@ -42,7 +42,7 @@
 
 \begin{document}
 \noindent
-\begin{adjustbox}{max width=\linewidth,max totalheight=\textheight,center}
+\begin{adjustbox}{max width=\linewidth,max totalheight=0.95\textheight,center}
 \begin{tikzpicture}[x=1cm,y=1cm]
 
 \node[anchor=north west,align=left] at (0,20.2) {{\bfseries\Large\color{ink} Round 1: a payment}\\[2pt]{\small Alice pays $v$ to Bob. As in Platypus, only Bob contacts the enclave and the bank}};
@@ -51,15 +51,15 @@
 $^{+}$ next value, for example $pk_A^{+}$ is Alice's next serial key \quad $\mathrm{Com}(b,pk,r)$ hides a state, $\sigma$ is the bank's signature on it};
 
 \def\xa{2.6}\def\xb{9.6}\def\xe{16.6}\def\xk{23.4}\def\xl{27.4}
-\foreach \x in {\xa,\xb,\xe,\xk,\xl} {\draw[lane] (\x,18.0) -- (\x,2.3);}
+\foreach \x in {\xa,\xb,\xe,\xk,\xl} {\draw[lane] (\x,18.0) -- (\x,1.4);}
 \node[head,draw=untrusted,fill=softred] at (\xa,18.3) {Alice (payer)};
 \node[head,draw=untrusted,fill=softred] at (\xb,18.3) {Bob (payee)};
 \node[head,draw=trust,fill=softgreen] at (\xe,18.3) {Enclave};
 \node[head,draw=curious,fill=soft,minimum width=3.2cm] at (\xk,18.3) {Bank};
-\node[head,draw=chan,fill=softblue,minimum width=2.2cm] at (\xl,18.3) {Public log};
+\node[head,draw=grey,fill=grey!12,minimum width=2.2cm] at (\xl,18.3) {Public log};
 
-\draw[sarr] (\xb,17.3) -- node[msg,text=chan]{\num{1} attest (fresh nonce)} (\xe,17.3);
-\draw[sarr] (\xe,16.6) -- node[msg,text=chan]{\num{2} attestation: code measurement, fresh channel key} (\xb,16.6);
+\draw[arr] (\xb,17.3) -- node[msg,above=1pt]{\num{1} attest (fresh nonce)} (\xe,17.3);
+\draw[arr] (\xe,16.6) -- node[msg,above=1pt]{\num{2} attestation: code measurement, fresh channel key, nonce} (\xb,16.6);
 
 \node[note,anchor=north west,text width=5.0cm,fill=softred!25] at (\xb-0.2,16.2) {\hd{Bob prepares}\\$C_B'=\mathrm{Com}(b_B+v,\ pk_B^{+},\ r_B^{+})$};
 \draw[arr] (\xb,15.0) -- node[msg]{\num{3} Request: $v$, $pk_B$, $C_B'$ \ + the attestation} (\xa,15.0);
@@ -72,29 +72,29 @@ $m=H(\text{``pay''},\ pk_A,\ C_A',\ pk_B,\ C_B')$, \ $sig_A=\mathrm{Sign}(sk_A,m
 \draw[arr] (\xa,12.25) -- node[msg]{\num{4} Offer: $pk_A$, $C_A'$, $sig_A$, {\color{chan}sealed opening}} (\xb,12.25);
 
 \node[note,anchor=north west,text width=5.0cm,fill=softred!25] at (\xb-0.2,11.85) {\hd{Bob signs the same transaction}\\$sig_B=\mathrm{Sign}(sk_B,m)$};
-\draw[sarr] (\xb,10.65) -- node[msg,text=chan]{\num{5} Receive: $v$, $(pk_A, C_A', pk_B, C_B')$, $sig_A$, $sig_B$,\\Alice's sealed opening, Bob's opening $b_B, r_B, \sigma_B, pk_B^{+}, r_B^{+}$ \ (all encrypted to the channel key)} (\xe,10.65);
+\draw[sarr] (\xb,10.0) -- node[msg,text=chan,above=1pt]{\num{5} Receive: $v$, $(pk_A, C_A', pk_B, C_B')$, $sig_A$, $sig_B$,\\Alice's sealed opening, Bob's opening $b_B, r_B, \sigma_B, pk_B^{+}, r_B^{+}$ \ (all encrypted to the channel key)} (\xe,10.0);
 
-\node[note,anchor=north west,text width=5.7cm,fill=softgreen!60] at (\xe+0.25,10.25) {\hd{Enclave checks}\\
+\node[note,anchor=north west,text width=5.7cm,fill=softgreen!60] at (\xe+0.25,9.6) {\hd{Enclave checks}\\
 E1 openings contain $pk_A$, $pk_B$; bank signatures valid \ek{}\\
 E2 $C_A'$, $C_B'$ open to $b_A-v$, $b_B+v$ \ek{}\\
-E3 $sig_A$, $sig_B$ valid on $m$\\
+E3 $sig_A$, $sig_B$ valid on $m$ \bk{}\\
 E4 $0<v\le b_A$, \ $b_B+v\le B_{\max}$ \ek{}\\
 in this order; one refusal for any failure\\
 erases the channel key afterwards};
-\draw[arr] (\xe,7.35) -- node[msg]{\num{6} Result: ``pay'', $pk_A, C_A', sig_A, pk_B, C_B', sig_B$ \ + enclave signature} (\xb,7.35);
+\draw[arr] (\xe,6.15) -- node[msg,above=1pt]{\num{6} Result: ``pay'', $pk_A, C_A', sig_A, pk_B, C_B', sig_B$ \ + enclave signature} (\xb,6.15);
 
-\draw[arr] (\xb,6.55) -- node[msg,pos=0.32]{\num{7} Settle(result), anonymous} (\xk,6.55);
-\node[note,anchor=north east,text width=6.4cm,fill=soft] at (\xk-0.2,6.15) {\hd{Bank checks}\\
-B1 same $m$ already settled: stored answer \bk{}\\
-B2 recompute $m$; $sig_A$ under $pk_A$, $sig_B$ under $pk_B$ \bk{}\\
+\draw[arr] (\xb,5.55) -- node[msg,pos=0.32]{\num{7} Settle(result), anonymous} (\xk,5.55);
+\node[note,anchor=north east,text width=6.4cm,fill=soft] at (\xk-0.2,5.15) {\hd{Bank checks}\\
+B1 recompute $m$; already settled: stored answer \bk{}\\
+B2 $sig_A$ under $pk_A$, $sig_B$ under $pk_B$ \bk{}\\
 B3 result signed by a registered enclave \ek{}\\
 B4 $pk_A\ne pk_B$, both unspent; burn both, sign $C_A'$, $C_B'$ \bk{}};
-\draw[arr] (\xk,4.6) -- node[msg,above=1pt]{\num{8} publish} (\xl,4.6);
-\draw[arr] (\xk,3.85) -- node[msg,pos=0.68]{\num{9} Settled: $\sigma_A'$, $\sigma_B'$} (\xb,3.85);
-\draw[arr] (\xb,3.1) -- node[msg]{\num{10} receipt $\sigma_A'$} (\xa,3.1);
-\draw[arr,dashed] (\xl,2.55) -- node[msg,pos=0.2]{or Alice finds $\sigma_A'$ under $pk_A$ in the public log} (\xa,2.55);
+\draw[arr] (\xk,3.65) -- node[msg,above=1pt]{\num{8} publish} (\xl,3.65);
+\draw[arr] (\xk,2.95) -- node[msg,pos=0.68]{\num{9} Settled: $\sigma_A'$, $\sigma_B'$} (\xb,2.95);
+\draw[arr] (\xb,2.3) -- node[msg]{\num{10} receipt $\sigma_A'$} (\xa,2.3);
+\draw[arr,dashed] (\xl,1.7) -- node[msg,pos=0.2]{or Alice finds $\sigma_A'$ under $pk_A$ in the public log} (\xa,1.7);
 
-\node[anchor=north west,text width=28.4cm,align=left,font=\sm,draw=grey,rounded corners=2pt,inner sep=4pt] at (0,1.9) {
+\node[anchor=north west,text width=28.4cm,align=left,font=\sm,draw=grey,rounded corners=2pt,inner sep=4pt] at (0,1.1) {
 \hd{Why both owners sign $m=H(\text{``pay''}, pk_A, C_A', pk_B, C_B')$.} Each serial is a one-time public key, so only the owner of a state can spend it, and the bank checks this itself (B2): signing keys never reach the enclave. The two signed commitments fix both new balances, so the amount and the payee cannot be changed. $v$ is left out of $m$ so the bank can recompute $m$ without learning the amount. \hd{What stays on the enclave's key:} that the spent states exist and that balances are conserved (E1, E2, E4), which the bank cannot see.};
 
 \end{tikzpicture}
