@@ -83,11 +83,9 @@ attested and registered by the bank at each boot;\\
 \hspace*{0.8em}signing key: signs results \ek{}\\[3pt]
 \hd{Checks a payment}\\
 \hspace*{0.8em}E1 both states carry a bank signature\\
-\hspace*{0.8em}E2 the same amount $v>0$ on both halves\\
-\hspace*{0.8em}E3 $b_A-v\ge 0$, \ $b_B+v\le B_{\max}$ \ek{}\\
-\hspace*{0.8em}E4 two different serials\\
-\hspace*{0.8em}E5 new states open to $b_A-v$ and $b_B+v$ \ek{}\\
-\hspace*{0.8em}E6 both owner signatures on $m$\\[3pt]
+\hspace*{0.8em}E2 $0<v\le b_A$, \ $b_B+v\le B_{\max}$ \ek{}\\
+\hspace*{0.8em}E3 new states open to $b_A-v$ and $b_B+v$ \ek{}\\
+\hspace*{0.8em}E4 both owner signatures on $m$\\[3pt]
 \hd{Sees}: the openings of both states\\
 \hd{Never sees}: a user's seed or signing key};
 
@@ -102,7 +100,7 @@ its own state, used to issue and redeem\\[2pt]
 \node[store,font=\xs,text width=5.4cm] at (23.0,16.85) {\hd{Checks a settlement}\\[2pt]
 B1 result signed by a registered enclave \ek{}\\
 B2 recompute $m$; Alice's signature under $pk_A$, Bob's under $pk_B$ \bk{}\\
-B3 both serials unspent; burn both together \bk{}\\
+B3 two different serials, both unspent; burn both together \bk{}\\
 B4 sign both new states; a retry gets the stored answer \bk{}};
 \node[store,font=\xs,text width=11.05cm,fill=softblue!60] at (17.3,13.95) {\hd{Public transaction log} (as in Platypus; anyone can read or mirror it)\\[2pt]
 per settlement: two spent serials, two new commitments, the owners' and the enclave's signatures, the bank's signatures\\
@@ -130,7 +128,7 @@ Enroll & one new commitment, time & who, the first serial
 A payment cannot be redirected or changed & both owners sign the exact new states ($m$) & \bk{} & \textbf{holds}: a different payee or amount changes $m$; a replay finds the serial spent\\\hline
 No double spend & spent serials (B3) & \bk{} & \textbf{holds}\\\hline
 Nobody can burn another user's state & burning a serial needs its owner's signature & \bk{} & \textbf{holds}\\\hline
-\rowcolor{softred!60}\textbf{Balance}: no money is created & conservation checked by the enclave (E3, E5), trusted through its signature (B1) & \ek{} & \textbf{fails}: the attacker signs results that inflate \emph{its own} states; it still cannot take anyone's money\\\hline
+\rowcolor{softred!60}\textbf{Balance}: no money is created & conservation checked by the enclave (E2, E3), trusted through its signature (B1) & \ek{} & \textbf{fails}: the attacker signs results that inflate \emph{its own} states; it still cannot take anyone's money\\\hline
 \rowcolor{softred!60}Privacy toward the bank & the enclave opens states, the bank sees only serials and commitments & enclave & \textbf{fails} for the payments processed: amounts, balances, and a link to each participant's next payment\\\hline
 \end{tabular}};
 
