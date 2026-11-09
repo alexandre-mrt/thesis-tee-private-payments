@@ -7,6 +7,10 @@
 ## The rule
 If the TEE breaks, **only privacy may be lost**. No money may be created, stolen, spent twice or destroyed. The bank must be able to reject every invalid payment **with checks it performs itself**. Those checks may rely on mathematics or on the bank's own records, never on a secret held by the TEE.
 
+**No secret that lets someone spend a user's funds or break integrity is ever sent to the TEE.** Users keep their seed and signing keys on their devices. The TEE may receive the private data it needs to check a payment, such as balances and blinds, because a leak of that data costs privacy only.
+
+**No secret belonging to a user is ever sent to the TEE.** A user's secrets are what gives authority over their money: the seed and every key derived from it. The TEE may receive private data it needs to check a payment, such as balances and blinds, because a leak of that data costs privacy only. It never receives anything that can sign, spend or derive future keys.
+
 ## What "the TEE breaks" means
 | The TEE... | Meaning | In scope |
 |---|---|---|
