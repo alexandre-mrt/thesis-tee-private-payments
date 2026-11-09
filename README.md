@@ -2,12 +2,13 @@
 
 EPFL master thesis at Mysten Labs (advisors Karl Wüst, Alberto Sonnino, Lefteris Kokoris-Kogias).
 
-**Rule of this repository:** it holds only what the advisors have validated. Every statement cites the meeting where it was validated. Working notes, proposals and drafts stay in the private workspace (`~/projects/thesis/Master Thesis`) and the prototype repository (`tee-pay`) until a meeting validates them.
+**Rule of this repository:** it holds what the advisors have validated, plus designs submitted to them for validation. Every file states its status, and every validated statement cites the meeting where it was validated. Working notes and explorations stay outside this repository.
 
 | File | Content | Status |
 |---|---|---|
 | [SCOPE.md](SCOPE.md) | Thesis scope and direction | Validated (2026-10-19 kickoff, 2026-10-29 Karl) |
 | [FOUNDATIONS.md](FOUNDATIONS.md) | Trust foundation: the TEE protects privacy, never integrity | Validated (2026-10-19 kickoff); its design consequences are listed as open questions |
+| [round-1/](round-1/README.md) | Round 1 design: Platypus with one TEE call in place of the zero-knowledge proofs, serials as one-time public keys, two maps | Submitted for validation (2026-11-09) |
 | [ROADMAP.md](ROADMAP.md) | What enters this repository next, and what must be validated first | Working list |
 
 ## Validation log

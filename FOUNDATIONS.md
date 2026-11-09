@@ -32,3 +32,8 @@ A broken TEE may lose this property for the payments it processed, but never the
    The choice decides what "a TEE replaces the ZK proofs" can mean under this principle.
 2. **Is the 2026-10-29 note "the TEE is trusted for correct execution, not for confidentiality" a transcription error?** It conflicts with the kickoff principle above, and needs confirming at the next meeting.
 3. **Which privacy properties may a broken TEE lose?** For example the payments it processed, or also the future linkability of the users involved.
+
+## Where round 1 stands (submitted 2026-11-09, not validated)
+[Round 1](round-1/README.md) meets the foundation for ownership and not yet for balance:
+- **Ownership, redirection, double spending, fund destruction:** enforced by the bank. Serials are one-time public keys, the owners sign each transaction, and no user key ever reaches the enclave.
+- **Balance conservation:** checked only by the enclave and trusted through its signing key. If that key leaks, an attacker can inflate its own states but cannot take anyone's money.
