@@ -1,10 +1,12 @@
 # Scope
 
+**Status:** validated (kickoff 2026-10-19, Karl 2026-10-29).
+
 ## Setting
 - **A central bank digital currency (CBDC) with a privacy focus** (kickoff, 2026-10-19).
 - **The baseline is Platypus** (Wüst et al., CCS 2022): "Platypus, but more efficient for a central bank with a TEE" (kickoff).
-- **Blockchain and Sui are optional.** A ledger is used only where it adds value (kickoff, D-001).
-- **A large spent set (nullifier set) is acceptable** in the central-bank setting (kickoff, D-005).
+- **Blockchain and Sui are optional.** A ledger is used only where it adds value (kickoff).
+- **A large spent set (nullifier set) is acceptable** in the central-bank setting (kickoff).
 - **Reuse existing building blocks:** "Take things that exist and put them together. Don't create a product" (kickoff).
 
 ## Direction
