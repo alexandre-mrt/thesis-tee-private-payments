@@ -95,7 +95,7 @@ To the bank, two keys from one chain are unrelated. In each payment, the enclave
 
 Alice pays `v` to Bob. As in Platypus, only the recipient talks to the system: Bob alone contacts the enclave and the bank.
 
-To see the diagram in full screen, open it in [Mermaid Live](https://mermaid.live/view#pako:eNptVF1v2zAM_CuEX5pgLtamBQZ0WwG7y1OKYcBeDQS0TMdCbMnTR4Kg6H8fJTuL6-zJskjdHY-U3hKhK0qeILH0x5MS9EPizmBXKAD0TivflWTCX4_GSSF7VA4yQAtZKwXBoscTmeU8Iw8ZuS6HOF3F1yG-VqLFA81jm3gW1X4eeA2BX75kYmj1LoTz2-fn9ROgc2QdLGpDtgGluZBIub7leH6Oo5NawSKUDB2h9YY6Ui6F4ZhoUClqYU-ndILxUzsCfSADDNQbYkVk4WWb38B3eNHdotzm8AkOKfT7bV741d0XTMGcl8uzzOwJTDA56ByT0wiz5NMTgR85-ZRoSOwtuIamad9K8_m59LKtgpjsIiYDJl7dr0ZF2UXRuFzGo1bulIUOjtI1YDlv2CVsLTRMrHtSUu3A6cg8MScIzAZfdV1z6iLQpFFFCowbfgIQVWeUayPn9PmkmyzcGVQWRSj0AskftqzUfGLEtbCIY3hjwTrZtiPtjI4h1_ehkPUjSAXaVGRS0Iq4IbW32EKtDaA6QY2y5amIVpBBS_Z_xZ-niufAt9zNIuEhL5LB7pkPlzaPBYRu0zD40QR0THgufsPGkHMt36sBfFYJx_NYSf4Y6J3hSdVHxZF_UDa9hk9jQZVkj5Rw4JVl-xxTGcnt_gqlN9yMYGw6NiaarOgIYdrIBhUb1vfKNyDcP9sMO4MPg-SKjfB3D-Ihlj8uebo_zL8g2btJ4pL1m_EpMYTV4Hc_ueNsa9KR6VBW4Z16KxLO6KjgnyKpqEZ2qUjeQ1p4sH6flOCQM554x_cVyx_ftHH7_S-IvKFL), or use the [payment map (PDF)](maps/payment.pdf).
+To see the diagram in full screen, open it in [Mermaid Live](https://mermaid.live/view#pako:eNptVF1r3DAQ_CuLX-KjDk0ugUJoD-z0ni6UQl8NYS2vz-JsydXHhSPkv3cl-3KO0yfL2tXM7OxKr4nQNSUPkFj660kJ-ilxb7AvFQB6p5XvKzLhb0DjpJADKgc5oIW8k4IgHfBEZrXMKEJGoasxTp_i2xDfKtHhkZaxXTyL6rAMPIXAb18xMXR6H8LF9WazfQB0jqyDtDFkW1CaC4mU22uOF-c4OqkVpKFk6AmtN9STchmMx0SLSlEHBzplM4xf2hHoIxlgoMEQKyILj8_FFfyAR92n1XMBX-CYwXB4Lkq_vvmGGZjzcnWWmT-ACSYHnVNyFmFWfHom8CMnnxItiYMF19I87Xtlvm4qL7s6iMkvYnJg4vXtelKUXxRNy1U8auVeWejhRboWLOeNu4SdhZaJ9UBKqj04HZln5gSB-eirbhpOTQNNFlVkwLjhJwBRfUb5bOSSvph1k4U7g8qiCIVeIPnDllWaT0y4FtI4hlcWrJNdN9Eu6BhyexsK2d6DVKBNTSYDrYgb0niLHTTaAKoTNCg7nopoBRm0ZP9X_HmqeA58x90sEx7yMhntXvhwafNUQOg2jYMfTUDHhOfid2wMOdfxvRrBF5VwvIiVFPeB3hmeVP2iOPIOZbPP8FksqJbskRIOvLJsn2MqI7nd0yQZ7kfwNpt6E31W9AJh4MgGITuW-MSXIFxB2447oxWj6pq98Dd34i46MC15wD9cAUFycLPEFZdgptfEENaj5cPsmrOzSU-mR1mHp-q1TDijp5J_yqSmBtmoMnkLaeHN-nNSgkPOeOIdP9Qsf3rWpu23f5g_om0), or use the [payment map (PDF)](maps/payment.pdf).
 
 ```mermaid
 sequenceDiagram
@@ -116,7 +116,7 @@ sequenceDiagram
   Note over E: E1 to E4 in order, one refusal for any failure<br/>erases the channel key
   E-->>B: result ("pay", pk_A, C_A', sig_A, pk_B, C_B', sig_B) + enclave signature
   B->>K: settle (result)
-  Note over K: B1 to B4: retry, owner signatures, enclave signature,<br/>distinct unspent serials; burns both, signs both new states
+  Note over K: B1 to B4: retry, owner signatures, enclave signature,<br/>distinct unspent serials<br/>burns both, signs both new states
   K->>L: publish
   K-->>B: settled (σ_A', σ_B')
   B->>A: receipt (σ_A'), or Alice reads the public log
