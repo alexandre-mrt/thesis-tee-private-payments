@@ -82,7 +82,7 @@ The keys change at every payment, and only the seed's owner can tell that they b
 
 ## 5. A payment
 
-Alice pays `v` to Bob. Bob makes the only call to the enclave and the only call to the bank, as in Platypus, where only the recipient talks to the bank.
+Alice pays `v` to Bob. As in Platypus, only the recipient talks to the system: Bob is the only one who contacts the enclave and the bank.
 
 ```mermaid
 sequenceDiagram
@@ -107,8 +107,8 @@ sequenceDiagram
 ```
 
 1. **Request.** Bob prepares his new state `C_B' = Com(b_B + v, pk_B⁺, r_B⁺)` and sends Alice the amount, his current serial `pk_B` and `C_B'`. He also relays the enclave's attestation, so Alice never contacts the bank's machine.
-2. **Offer.** Alice checks the attestation. She builds `C_A' = Com(b_A − v, pk_A⁺, r_A⁺)` and signs the transaction `m = H(pk_A, C_A', pk_B, C_B')` with `sk_A`. She seals the opening of her current state to the enclave, so Bob cannot read it, and hands Bob the offer.
-3. **Receive.** Bob signs the same `m` with `sk_B` and sends both halves to the enclave.
+2. **Offer.** Alice checks the attestation. She builds `C_A' = Com(b_A − v, pk_A⁺, r_A⁺)` and signs the transaction `m = H(pk_A, C_A', pk_B, C_B')` with `sk_A`. She seals her half (the amount, the opening of her current state, her next key and blind) to the enclave, so Bob cannot read it, and hands Bob the offer.
+3. **Receive.** Bob signs the same `m` with `sk_B` and sends both halves to the enclave over the attested encrypted channel, so the bank's machine sees only ciphertext.
 4. **Check.** The enclave runs the checks of section 6 and returns one signed result.
 5. **Settle.** Bob submits the result. The bank runs its checks, burns both serials together, appends the transaction to the public log, and signs both new states.
 6. **Finish.** Bob forwards Alice's new signature. If he does not, Alice finds it in the public log under her old serial.
@@ -218,8 +218,8 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 |---|---|---|
 | Attestation | enclave → Bob → Alice | code measurement, channel key, the enclave's signing key, the bank's key it enforces, freshness nonce |
 | Request | Bob → Alice | `v`, `pk_B`, `C_B'` |
-| Offer | Alice → Bob | `v`, `pk_A`, `C_A'`, `sig_A = Sign(sk_A, m)`, sealed half = `Enc(enclave, b_A, r_A, σ_A, pk_A⁺, r_A⁺, pk_B, C_B')` |
-| Receive | Bob → enclave | `v`, Alice's sealed half, `sig_A`, and Bob's half `b_B, r_B, σ_B, pk_B, pk_B⁺, r_B⁺, sig_B` |
+| Offer | Alice → Bob | `v`, `pk_A`, `C_A'`, `sig_A = Sign(sk_A, m)`, sealed half = `Enc(enclave, v, b_A, pk_A, r_A, σ_A, pk_A⁺, r_A⁺, pk_B, C_B')` |
+| Receive | Bob → enclave, encrypted to the channel key | `v`, Alice's sealed half, `sig_A`, and Bob's half `b_B, pk_B, r_B, σ_B, pk_B⁺, r_B⁺, sig_B` |
 | Result | enclave → Bob | `pk_A, C_A', sig_A, pk_B, C_B', sig_B`, signed by the enclave |
 | Settle / Settled | Bob ↔ bank | the result / the bank's signatures `σ_A'`, `σ_B'` on the new states |
 | Receipt | Bob → Alice | `σ_A'` |

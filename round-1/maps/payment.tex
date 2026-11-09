@@ -45,7 +45,7 @@
 \begin{adjustbox}{max width=\linewidth,max totalheight=\textheight,center}
 \begin{tikzpicture}[x=1cm,y=1cm]
 
-\node[anchor=north west,align=left] at (0,20.2) {{\bfseries\Large\color{ink} Round 1: a payment}\\[2pt]{\small Alice pays $v$ to Bob. Bob makes the only enclave call and the only bank call, as in Platypus}};
+\node[anchor=north west,align=left] at (0,20.2) {{\bfseries\Large\color{ink} Round 1: a payment}\\[2pt]{\small Alice pays $v$ to Bob. As in Platypus, only the recipient talks to the system:}\\{\small Bob alone contacts the enclave and the bank}};
 \node[anchor=north east,align=left,font=\xs,draw=grey,rounded corners=2pt,inner sep=4pt] at (28.6,20.2) {
 {\color{chan}\textbf{blue}} sealed to the attested enclave \quad \bk{} check the bank does itself \quad \ek{} rests on the enclave's signing key\\
 $^{+}$ next value, for example $pk_A^{+}$ is Alice's next serial key \quad $\mathrm{Com}(b,pk,r)$ hides a state, $\sigma$ is the bank's signature on it};
@@ -68,11 +68,11 @@ $^{+}$ next value, for example $pk_A^{+}$ is Alice's next serial key \quad $\mat
 checks the attestation offline (never contacts the bank's machine)\\
 $C_A'=\mathrm{Com}(b_A-v,\ pk_A^{+},\ r_A^{+})$\\
 $m=H(pk_A,\ C_A',\ pk_B,\ C_B')$, \ $sig_A=\mathrm{Sign}(sk_A,m)$\\
-{\color{chan}seals} $b_A, r_A, \sigma_A, pk_A^{+}, r_A^{+}, pk_B, C_B'$ to the enclave};
+{\color{chan}seals} $v, b_A, pk_A, r_A, \sigma_A, pk_A^{+}, r_A^{+}, pk_B, C_B'$ to the enclave};
 \draw[arr] (\xa,12.25) -- node[msg]{\num{4} Offer: $v$, $pk_A$, $C_A'$, $sig_A$, {\color{chan}sealed half}} (\xb,12.25);
 
 \node[note,anchor=north west,text width=5.0cm,fill=softred!25] at (\xb-0.2,11.85) {\hd{Bob signs the same transaction}\\$sig_B=\mathrm{Sign}(sk_B,m)$};
-\draw[sarr] (\xb,10.65) -- node[msg,text=chan]{\num{5} Receive: $v$, {\color{chan}Alice's sealed half}, $sig_A$,\\Bob's half $b_B, r_B, \sigma_B, pk_B, pk_B^{+}, r_B^{+}, sig_B$} (\xe,10.65);
+\draw[sarr] (\xb,10.65) -- node[msg,text=chan]{\num{5} Receive: $v$, {\color{chan}Alice's sealed half}, $sig_A$,\\Bob's half $b_B, pk_B, r_B, \sigma_B, pk_B^{+}, r_B^{+}, sig_B$ \ (all encrypted to the channel key)} (\xe,10.65);
 
 \node[note,anchor=north west,text width=5.7cm,fill=softgreen!60] at (\xe+0.25,10.25) {\hd{Enclave checks}\\
 E1 both states carry a bank signature\\

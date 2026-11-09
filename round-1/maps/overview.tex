@@ -43,7 +43,7 @@
 \begin{adjustbox}{max width=\linewidth,max totalheight=\textheight,center}
 \begin{tikzpicture}[x=1cm,y=1cm]
 
-\node[anchor=north west,align=left] at (0,20.2) {{\bfseries\Large\color{ink} Round 1: overview}\\[2pt]{\small Platypus with one TEE call in place of the two zero-knowledge proofs}\\{\small Serials are one-time public keys: no user key ever reaches the enclave}};
+\node[anchor=north west,align=left] at (0,20.2) {{\bfseries\Large\color{ink} Round 1: overview}\\[2pt]{\small Platypus with one TEE call in place of the two zero-knowledge proofs}\\{\small Serials are one-time public keys: no secret that can spend a user's funds reaches the enclave}};
 \node[anchor=north east,align=left,font=\xs,draw=grey,rounded corners=2pt,inner sep=4pt] at (28.6,20.2) {
 \hd{Parties.} {\color{untrusted}\textbf{red}} untrusted \quad {\color{trust}\textbf{green}} runs attested code, may crash \quad {\color{curious}\textbf{orange}} trusted for integrity, curious about privacy\\
 \hd{Guarantees.} \bk{} rests on a check the bank does itself \quad \ek{} rests on the secrecy of the enclave's signing key\\
@@ -79,7 +79,7 @@ Runs the attested code correctly; may crash;\\
 attested and registered by the bank at each boot;\\
 \textbf{keeps nothing between requests}\\[3pt]
 \hd{Per boot, never stored}\\
-\hspace*{0.8em}channel key: opens sealed halves\\
+\hspace*{0.8em}channel key: decrypts requests and sealed halves\\
 \hspace*{0.8em}signing key: signs results \ek{}\\[3pt]
 \hd{Checks a payment}\\
 \hspace*{0.8em}E1 both states carry a bank signature\\
@@ -89,7 +89,7 @@ attested and registered by the bank at each boot;\\
 \hspace*{0.8em}E5 new states open to $b_A-v$ and $b_B+v$ \ek{}\\
 \hspace*{0.8em}E6 both owner signatures on $m$\\[3pt]
 \hd{Sees}: the openings of both states\\
-\hd{Never sees}: a seed or a signing key};
+\hd{Never sees}: a user's seed or signing key};
 
 \draw[draw=curious,fill=soft,rounded corners=4pt,line width=1.1pt] (17.15,18.3) rectangle (28.6,9.6);
 \node[anchor=north west,align=left,text width=11.2cm,inner sep=3pt,font=\sm] at (17.2,18.25) {\hd{\color{curious}Bank}: issues the money, runs the enclave, signs new states\\[1pt]{\xs Follows the protocol and signs only valid results; analyses all it sees; may collude with users; keeps its records}};
@@ -134,7 +134,7 @@ Nobody can burn another user's state & burning a serial needs its owner's signat
 \rowcolor{softred!60}Privacy toward the bank & the enclave opens states, the bank sees only serials and commitments & enclave & \textbf{fails} for the payments processed: amounts, balances, and a link to each participant's next payment\\\hline
 \end{tabular}};
 
-\node[anchor=north west,font=\xs,text=grey,align=left] at (0,3.4) {Integrity is not yet fully decoupled from the TEE: ownership is enforced by the bank, balance conservation still rests on the enclave's key.\\Next step: let the bank check conservation without seeing values (per-result attestation, additive commitments with range proofs, or zero-knowledge proofs).};
+\node[anchor=north west,font=\xs,text=grey,align=left] at (0,3.4) {Integrity is not yet fully decoupled from the TEE: ownership is enforced by the bank, balance conservation still rests on the enclave's key.\\Next step: let the bank check conservation without seeing values (zero-knowledge proofs as in Platypus, additive commitments with range proofs, or per-result attestation).};
 
 \end{tikzpicture}
 \end{adjustbox}
