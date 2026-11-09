@@ -2,13 +2,19 @@
 
 **Status:** submitted for advisor validation (2026-11-09). Builds on [SCOPE.md](../SCOPE.md) and [FOUNDATIONS.md](../FOUNDATIONS.md).
 
-**Maps:** [overview](maps/overview.pdf) (actors, what each holds, who guarantees what) and [payment](maps/payment.pdf) (messages and checks).
-
-![Round 1 overview](maps/overview.png)
+| Design | Behaviour | Analysis |
+|---|---|---|
+| [1. Goal](#1-goal-stay-as-close-to-platypus-as-possible) | [5. A payment](#5-a-payment) | [9. If the enclave's memory is read](#9-if-the-enclaves-memory-is-read) |
+| [2. In one paragraph](#2-the-system-in-one-paragraph) | [6. Who checks what](#6-who-checks-what) | [10. What the bank learns](#10-what-the-bank-learns) |
+| [3. Setting and trust](#3-setting-and-trust) | [7. Other operations](#7-other-operations) | [11. Differences from Platypus](#11-differences-from-platypus) |
+| [4. State and ownership](#4-state-and-the-chain-of-ownership) | [8. Crashes](#8-when-the-enclave-crashes) | [12. Possible solutions for balance](#12-possible-solutions-for-balance-integrity) |
+| [Overview map](#overview-map) | [Appendix A: messages](#appendix-a-messages) | [Appendix B: notation](#appendix-b-notation) |
 
 ![Round 1 payment](maps/payment.png)
 
-## 1. Goal: change one thing at a time
+The [payment map](maps/payment.pdf) and the [overview map](maps/overview.pdf) are also available as PDF.
+
+## 1. Goal: stay as close to Platypus as possible
 
 Round 1 stays **as close to Platypus as possible**. The aim is to isolate a single change, replacing the two zero-knowledge proofs of a Platypus transaction with one call to a TEE run by the bank, so that its effect on cost, privacy and trust can be measured on its own.
 
@@ -20,9 +26,9 @@ Everything else is Platypus:
 - the same issuance through the bank's own account;
 - the same abort by an empty update.
 
-Regulation (limits, reports, identity) is left for later rounds, one feature at a time.
-
-On top of the replacement, round 1 makes one adjustment required by the foundation: **no long-term user secret is ever sent to the enclave.** The version presented on 2026-11-03 gave the enclave the user's serial and blinding keys. This version makes each serial a one-time public key and has the owner sign each transaction. The enclave only ever sees signed transactions, never a key that can sign.
+> **On top of the replacement, round 1 makes one adjustment required by the foundation: no user secret that can spend funds is ever sent to the enclave.**
+>
+> **The version presented on 2026-11-03 gave the enclave the user's serial and blinding keys.** This version makes each serial a one-time public key and has the owner sign each transaction. The enclave only ever sees signed transactions, never a key that can sign.
 
 ## 2. The system in one paragraph
 
@@ -46,7 +52,7 @@ Each user holds a **state** (a balance, a one-time public key that serves as the
 A state is `S = (b, pk, r)`:
 - `b` is the balance;
 - `pk` is a one-time public key, which also serves as the serial;
-- `r` is a random blind.
+- `r` is a random blind. It keeps the commitment hiding once `pk` is revealed at spend: without it, the bank could hash every possible balance with the revealed `pk` until one matches a published commitment, which would reveal the balance and link the payment to the one that created the state.
 
 The bank signs a commitment `C = Com(b, pk, r)` without learning its content. The commitment hides `S`, and the bank's signature `σ` makes it valid money.
 
@@ -189,11 +195,20 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 | Extra pieces needed by the TEE | none | attestation and enclave registration, resealing after a crash, deterministic results, idempotent settlement |
 | State, serial check, public log, issuance, abort | as described in the paper | the same |
 
-**Next step: closing the balance-integrity gap.** The bank must be able to check conservation without seeing values. A TEE alone cannot give it that. The options, each with its trade-off, are for discussion:
-- the enclave attests every result, so trust moves to the TEE vendor and to correct code;
-- additive commitments with range proofs, so the bank sees the payment graph but not the amounts;
-- the same, with the TEE batching payments to hide the graph within each batch;
-- zero-knowledge proofs as in Platypus, with the TEE only reducing cost.
+## 12. Possible solutions for balance integrity
+
+**The goal:** the bank checks balance conservation itself, as it already checks ownership, while keeping Platypus's privacy. The bank cannot check values it does not see without some cryptographic proof, so a TEE alone cannot do it. The options, for discussion:
+
+| Option | Balance rests on | The bank sees who pays whom | Amounts hidden | Role of the TEE | Cost |
+|---|---|---|---|---|---|
+| **Zero-knowledge proofs as in Platypus** | mathematics | no | yes | computes the proofs for weak devices; a break leaks what it saw | one proof per payment |
+| **Additive commitments with range proofs** | mathematics | yes | yes | not needed for integrity | small proofs, cheap checks |
+| **The same, with the TEE batching payments** | mathematics | only which batch | yes | hides who pays whom inside a batch; a break reveals that pairing | batch rounds, all participants online |
+| **The enclave attests every result** | the TEE vendor and correct code | no | yes | as in round 1 | one attestation per payment |
+
+## Overview map
+
+![Round 1 overview](maps/overview.png)
 
 ## Appendix A: messages
 
