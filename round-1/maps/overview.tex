@@ -57,11 +57,12 @@
 \textbf{bank signature} $\sigma$ on $C=\mathrm{Com}(b,pk,r)$: makes it money\\
 \textbf{one-time keys} $sk_i, pk_i$: $pk_i$ is the serial of the $i$-th state};
 \node[store,font=\xs,text width=6.75cm,fill=softred!25] at (0.12,14.55) {\hd{To pay or receive}\\[2pt]
-build the new state $C'$ with the next key and blind\\
-sign $m=H(pk_A, C_A', pk_B, C_B')$ with the spent state's $sk$\\
-seal the opening of the current state to the enclave\\
-Bob submits to the enclave, then settles with the bank\\
-finish with Bob's receipt or the public log};
+each builds its new state $C'$ with its next key and blind\\
+both sign the transaction $m=H(pk_A, C_A', pk_B, C_B')$ with $sk$\\
+Alice seals her opening to the enclave so Bob cannot read it\\
+Bob sends the enclave the transaction, both signatures and\\
+\hspace*{0.8em}both openings, then settles the result with the bank\\
+Alice finishes with Bob's receipt or the public log};
 \node[store,font=\xs,text width=6.75cm,fill=softred!25] at (0.12,12.0) {\hd{Chain of ownership}\\[2pt]
 $C_0$ holds $pk_0$ \ $\xrightarrow{\ \text{signed by } sk_0\ }$ \ $C_1$ holds $pk_1$ \ $\xrightarrow{\ \text{signed by } sk_1\ }$ \ $C_2$\\[2pt]
 Every next key sits in a state the bank signed only after\\
@@ -79,7 +80,7 @@ Runs the attested code correctly; may crash;\\
 attested and registered by the bank at each boot;\\
 \textbf{keeps nothing between requests}\\[3pt]
 \hd{Per boot, never stored}\\
-\hspace*{0.8em}channel key: decrypts requests and sealed halves\\
+\hspace*{0.8em}channel key: decrypts requests and sealed openings\\
 \hspace*{0.8em}signing key: signs results \ek{}\\[3pt]
 \hd{Checks a payment}\\
 \hspace*{0.8em}E1 both states carry a bank signature\\
@@ -113,7 +114,7 @@ Refresh & one spent serial, one new commitment, time & who, the balance\\
 Enroll & one new commitment, time & who, the first serial
 \end{tabular}};
 
-\draw[sarr] (7.2,16.6) -- (9.7,16.6) node[albl,text=chan,pos=0.5,above=1pt]{sealed halves};
+\draw[sarr] (7.2,16.6) -- (9.7,16.6) node[albl,text=chan,pos=0.5,above=1pt]{encrypted requests};
 \draw[arr] (9.7,15.8) -- (7.2,15.8) node[albl,pos=0.5,below=1pt]{signed result};
 \draw[arr,{Stealth[length=4.5pt]}-{Stealth[length=4.5pt]}] (7.2,10.05) -- (17.15,10.05) node[albl,pos=0.5]{settle, refresh, enroll, read the log (anonymous)};
 

@@ -69,10 +69,10 @@ checks the attestation offline (never contacts the bank's machine)\\
 $C_A'=\mathrm{Com}(b_A-v,\ pk_A^{+},\ r_A^{+})$\\
 $m=H(pk_A,\ C_A',\ pk_B,\ C_B')$, \ $sig_A=\mathrm{Sign}(sk_A,m)$\\
 {\color{chan}seals} $b_A, r_A, \sigma_A, pk_A^{+}, r_A^{+}$ to the enclave};
-\draw[arr] (\xa,12.25) -- node[msg]{\num{4} Offer: $pk_A$, $C_A'$, $sig_A$, {\color{chan}sealed half}} (\xb,12.25);
+\draw[arr] (\xa,12.25) -- node[msg]{\num{4} Offer: $pk_A$, $C_A'$, $sig_A$, {\color{chan}sealed opening}} (\xb,12.25);
 
 \node[note,anchor=north west,text width=5.0cm,fill=softred!25] at (\xb-0.2,11.85) {\hd{Bob signs the same transaction}\\$sig_B=\mathrm{Sign}(sk_B,m)$};
-\draw[sarr] (\xb,10.65) -- node[msg,text=chan]{\num{5} Receive: $v$, $(pk_A, C_A', pk_B, C_B')$, $sig_A$, $sig_B$,\\Alice's sealed half, Bob's $b_B, r_B, \sigma_B, pk_B^{+}, r_B^{+}$ \ (all encrypted to the channel key)} (\xe,10.65);
+\draw[sarr] (\xb,10.65) -- node[msg,text=chan]{\num{5} Receive: $v$, $(pk_A, C_A', pk_B, C_B')$, $sig_A$, $sig_B$,\\Alice's sealed opening, Bob's opening $b_B, r_B, \sigma_B, pk_B^{+}, r_B^{+}$ \ (all encrypted to the channel key)} (\xe,10.65);
 
 \node[note,anchor=north west,text width=5.7cm,fill=softgreen!60] at (\xe+0.25,10.25) {\hd{Enclave checks}\\
 E1 both states carry a bank signature\\

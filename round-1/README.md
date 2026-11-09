@@ -32,7 +32,7 @@ Everything else is Platypus:
 
 ## 2. The system in one paragraph
 
-Each user holds a **state** (a balance, a one-time public key that serves as the serial, and a blind) together with the bank's signature on a commitment to it. To pay, the payer and the payee each prepare their half of a joint transaction and **sign it with the one-time key of the state they spend**. The payee submits both halves to the enclave. The enclave checks that both states are genuine, that the balances add up and that both owners signed, then outputs a signed result. The payee sends the result to the bank. The bank checks the enclave's signature and **both owners' signatures**, burns the two serials, publishes the transaction in the public log, and signs both new states. The bank never sees balances, amounts, or who pays whom.
+Each user holds a **state** (a balance, a one-time public key that serves as the serial, and a blind) together with the bank's signature on a commitment to it. To pay, the payer and the payee agree on one joint transaction (both spent serials and both new commitments) and each **signs it with the one-time key of the state they spend**. The payee sends the enclave the transaction, both signatures, and both parties' openings; the payer's opening is sealed so the payee cannot read it. The enclave checks that both states are genuine, that the balances add up and that both owners signed, then outputs a signed result. The payee sends the result to the bank. The bank checks the enclave's signature and **both owners' signatures**, burns the two serials, publishes the transaction in the public log, and signs both new states. The bank never sees balances, amounts, or who pays whom.
 
 ## 3. Setting and trust
 
@@ -95,9 +95,9 @@ sequenceDiagram
   E-->>B: attestation (code measurement, channel key)
   B->>A: payment request (v, Bob's serial, Bob's new commitment) + attestation
   Note over A: checks the attestation<br/>builds her new state<br/>signs the transaction with her one-time key
-  A->>B: offer (her serial, her new commitment, her signature, her sealed half)
+  A->>B: offer (her serial, her new commitment, her signature, her sealed opening)
   Note over B: signs the same transaction with his one-time key
-  B->>E: both halves (Alice's still sealed)
+  B->>E: transaction, both signatures, both openings (Alice's still sealed)
   Note over E: checks both states, amount, balances, signatures
   E-->>B: signed result (2 spent serials, 2 new commitments, 2 owner signatures)
   B->>K: settle
@@ -108,7 +108,7 @@ sequenceDiagram
 
 1. **Request.** Bob prepares his new state `C_B' = Com(b_B + v, pk_B⁺, r_B⁺)` and sends Alice the amount, his current serial `pk_B` and `C_B'`. He also relays the enclave's attestation, so Alice never contacts the bank's machine.
 2. **Offer.** Alice checks the attestation. She builds `C_A' = Com(b_A − v, pk_A⁺, r_A⁺)` and signs the transaction `m = H(pk_A, C_A', pk_B, C_B')` with `sk_A`. She seals the opening of her current state and her next key and blind to the enclave, so Bob cannot read them, and hands Bob the offer.
-3. **Receive.** Bob signs the same `m` with `sk_B`. He sends the enclave the transaction, both signatures, Alice's sealed half and his own opening, over the attested encrypted channel, so the bank's machine sees only ciphertext.
+3. **Receive.** Bob signs the same `m` with `sk_B`. He sends the enclave the transaction, both signatures, Alice's sealed opening and his own opening, over the attested encrypted channel, so the bank's machine sees only ciphertext.
 4. **Check.** The enclave runs the checks of section 6 and returns one signed result.
 5. **Settle.** Bob submits the result. The bank runs its checks, burns both serials together, appends the transaction to the public log, and signs both new states.
 6. **Finish.** Bob forwards Alice's new signature. If he does not, Alice finds it in the public log under her old serial.
@@ -147,7 +147,7 @@ sequenceDiagram
 ## 8. When the enclave crashes
 
 The enclave keeps nothing between requests, so a crash loses nothing:
-- **Before the bank records the payment:** nothing happened. Bob resends to a fresh instance. Alice's half was sealed to the old instance's key, so she reseals the same content for the new one. Her signature does not change, because `m` names no enclave.
+- **Before the bank records the payment:** nothing happened. Bob resends to a fresh instance. Alice's opening was sealed to the old instance's key, so she reseals the same content for the new one. Her signature does not change, because `m` names no enclave.
 - **After the result, before settlement:** Bob settles the result he already holds. The bank keeps the old instance's registered key valid long enough to accept it.
 - **After the bank records it:** a retry of the same result gets the stored answer. There is never a second debit.
 - **Deterministic results:** every new key and blind comes from the users, so the same input always gives the same result.
@@ -188,9 +188,9 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 
 | | Platypus | Round 1 |
 |---|---|---|
-| Validity of a transaction | two zero-knowledge proofs, one per party, bound by a transaction commitment | one enclave check of both halves, and one signed result |
+| Validity of a transaction | two zero-knowledge proofs, one per party, bound by a transaction commitment | one enclave check of the whole transaction, and one signed result |
 | Ownership of a state | proven inside the zero-knowledge proof | the owner signs with the serial's one-time key, and the bank verifies it |
-| Payer's half | proof sent with the transaction | sealed to the attested enclave, so the payee cannot read it |
+| Payer's private data | hidden inside her proof | sealed to the attested enclave, so the payee cannot read it |
 | Balance conservation | guaranteed by the proofs (mathematics) | guaranteed by the enclave's check and its key |
 | Extra pieces needed by the TEE | none | attestation and enclave registration, resealing after a crash, deterministic results, idempotent settlement |
 | State, serial check, public log, issuance, abort | as described in the paper | the same |
@@ -216,8 +216,8 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 |---|---|---|
 | Attestation | enclave → Bob → Alice | code measurement, channel key, freshness nonce. The enclave's signing key is registered with the bank separately, at boot. |
 | Request | Bob → Alice | `v`, `pk_B`, `C_B'` |
-| Offer | Alice → Bob | `pk_A`, `C_A'`, `sig_A = Sign(sk_A, m)`, sealed half = `Enc(enclave, b_A, r_A, σ_A, pk_A⁺, r_A⁺)` |
-| Receive | Bob → enclave, encrypted to the channel key | `v`, the transaction `(pk_A, C_A', pk_B, C_B')`, `sig_A`, `sig_B`, Alice's sealed half, and Bob's opening `b_B, r_B, σ_B, pk_B⁺, r_B⁺` |
+| Offer | Alice → Bob | `pk_A`, `C_A'`, `sig_A = Sign(sk_A, m)`, sealed opening = `Enc(enclave, b_A, r_A, σ_A, pk_A⁺, r_A⁺)` |
+| Receive | Bob → enclave, encrypted to the channel key | `v`, the transaction `(pk_A, C_A', pk_B, C_B')`, `sig_A`, `sig_B`, Alice's sealed opening, and Bob's opening `b_B, r_B, σ_B, pk_B⁺, r_B⁺` |
 | Result | enclave → Bob | `pk_A, C_A', sig_A, pk_B, C_B', sig_B`, signed by the enclave |
 | Settle / Settled | Bob ↔ bank | the result / the bank's signatures `σ_A'`, `σ_B'` on the new states |
 | Receipt | Bob → Alice | `σ_A'` |
