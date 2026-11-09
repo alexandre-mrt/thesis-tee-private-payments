@@ -1,39 +1,41 @@
 # Foundation: the TEE protects privacy, never integrity
 
-## Validated principle
-"TEE not for integrity but for privacy" (kickoff, 2026-10-19, all advisors). Combined with "the bank is trusted for integrity" (Karl, 2026-10-29), this gives:
+> "TEE not for integrity but for privacy." (all advisors, kickoff 2026-10-19)
+>
+> "The bank is trusted for integrity." (Karl, 2026-10-29)
 
-| If the TEE... | Privacy | Integrity (no forged, stolen or duplicated money) | Availability |
+## The rule
+If the TEE breaks, **only privacy may be lost**. No money may be created, stolen, spent twice or destroyed. The bank must be able to reject every invalid payment **with checks it performs itself**. Those checks may rely on mathematics or on the bank's own records, never on a secret held by the TEE.
+
+## What "the TEE breaks" means
+| The TEE... | Meaning | In scope |
+|---|---|---|
+| **works** | runs the attested code and keeps its memory secret | yes |
+| **crashes** | stops and loses its memory; a fresh instance starts | yes |
+| **is broken** | runs the attested code correctly, but everything it holds or receives can be read: its inputs and its own keys | yes |
+| **runs malicious code** | its code is replaced | no |
+
+## What must hold in each case
+| Property | Plain meaning | Works | Crashes | Broken |
+|---|---|---|---|---|
+| **Ownership** | only the owner spends a state; a payment cannot be changed or redirected | must hold | must hold | **must hold** |
+| **Balance** | every payment moves exactly its amount; no money is created | must hold | must hold | **must hold** |
+| **No double spend** | each state is spent once | must hold | must hold | **must hold** |
+| **No fund destruction** | nobody can make another user's state unspendable | must hold | must hold | **must hold** |
+| **Privacy toward the bank** | the bank learns neither who pays whom, nor amounts, nor balances | must hold | must hold | may be lost for the payments the TEE processed |
+| **Availability** | payments go through | must hold | paused until a new instance runs | not required |
+
+The four integrity properties are those of Platypus (Section 5). The privacy property is Platypus's transaction indistinguishability (Definition 5.2).
+
+## What follows from the rule
+These consequences are derived, not yet validated.
+- **The TEE alone cannot prove balances to the bank.** To check balances it cannot see, the bank must verify something about hidden values, and doing that without learning anything else is a zero-knowledge proof by definition. A TEE can only vouch with its signature or its attestation, so a design that relies on the TEE for balance moves integrity onto the TEE.
+- **Ownership is cheap to keep on the bank's side.** Owners sign their own transactions with keys that never leave their devices, and the bank verifies those signatures.
+- **The TEE's role is privacy and cost.** It can open states, hide who pays whom, or compute proofs on behalf of weak devices. A break then leaks what it saw, and the bank's checks are unaffected.
+
+## Where the designs stand
+| Design | Ownership | Balance | Status |
 |---|---|---|---|
-| works | Holds | Holds | Holds |
-| crashes | Holds | Holds | Paused until a new instance runs |
-| is broken (its memory read or its keys used) | May be lost for the data it processed | **Must still hold** | Not required |
+| [Round 1](round-1/README.md) | checked by the bank | checked by the enclave, trusted through its signing key | submitted 2026-11-09 |
 
-**Integrity must never depend on the TEE.** The bank, which is trusted for integrity, must be able to reject every invalid payment using only what it can verify itself: its own signatures, its spent set, and checks that need no secret held by the enclave.
-
-## Integrity properties that must survive a broken TEE
-From Platypus, Section 5:
-- **Unforgeability:** nobody spends a state they do not own, and nobody changes the amount of a payment.
-- **Balance invariance:** every payment moves exactly its amount; no money is created or destroyed.
-- **No double spending:** each state is spent once.
-- **Fund-destruction resistance:** nobody can make another user's state unspendable.
-
-## Privacy properties the TEE may protect
-- **Transaction indistinguishability toward the bank** (Platypus Def. 5.2): the bank does not learn who pays whom, amounts or balances.
-
-A broken TEE may lose this property for the payments it processed, but never the integrity properties above.
-
-## Open design questions (not validated)
-1. **Who verifies validity, if not the TEE?** The bank must check balance conservation and ownership without seeing values. Candidates:
-   - zero-knowledge proofs, as in Platypus (the TEE then helps with privacy-related work only, for example as a delegated prover that holds witnesses but no authority);
-   - user signatures with one-time keys, which stop theft of existing funds but not counterfeiting;
-   - several TEEs from different vendors co-signing, which only raises the bar.
-
-   The choice decides what "a TEE replaces the ZK proofs" can mean under this principle.
-2. **Is the 2026-10-29 note "the TEE is trusted for correct execution, not for confidentiality" a transcription error?** It conflicts with the kickoff principle above, and needs confirming at the next meeting.
-3. **Which privacy properties may a broken TEE lose?** For example the payments it processed, or also the future linkability of the users involved.
-
-## Where round 1 stands (submitted 2026-11-09, not validated)
-[Round 1](round-1/README.md) meets the foundation for ownership and not yet for balance:
-- **Ownership, redirection, double spending, fund destruction:** enforced by the bank. Serials are one-time public keys, the owners sign each transaction, and no user key ever reaches the enclave.
-- **Balance conservation:** checked only by the enclave and trusted through its signing key. If that key leaks, an attacker can inflate its own states but cannot take anyone's money.
+In round 1, a leaked enclave key lets an attacker inflate its own states, but not take anyone's money. Closing that gap is the next design step (round 1, section 11).
