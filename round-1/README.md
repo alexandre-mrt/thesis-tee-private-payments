@@ -45,7 +45,8 @@ Each user holds a **state** (a balance, a one-time public key that serves as the
 
 **Assumptions:**
 - The payee's payment request reaches the payer over an authenticated channel. Payee authentication is out of scope.
-- The hand-off between payer and payee is confidential. In this version that is needed for privacy only, not for integrity (section 9).
+- The hand-off between payer and payee is confidential. It is needed for privacy only: an eavesdropper on the offer would learn the amount, but could not change or redirect the payment (section 5).
+- For the analysis of section 9, the enclave's memory may also be read while its code keeps running correctly. Replacing its code is out of scope.
 
 ## 4. State and the chain of ownership
 
@@ -141,7 +142,7 @@ sequenceDiagram
 | Operation | What happens | What the bank learns |
 |---|---|---|
 | **Enroll** | The user creates a first state at balance 0 with `pk_0`. The enclave checks the balance is 0, and the bank signs it. | one new commitment |
-| **Refresh** (abort) | Platypus's empty update: the owner signs a move of the same balance to a new key. This cancels an offer that was never received. | one spent serial, one new commitment |
+| **Refresh** (abort) | Platypus's empty update: the owner signs a move of the same balance to a new key. This cancels an offer that was never received. A party whose serial was shown to the counterparty or to the bank in a payment that did not complete refreshes too, so no exposed serial stays in use. | one spent serial, one new commitment |
 | **Issue and redeem** | As in Platypus, the bank holds a state for its own account and pays users through ordinary payments. Redeeming is a payment to the bank. | its own side and the amount, never the user |
 | **Read the public log** | Anyone can read it or mirror it. A user finds the bank's signature on a new state under the old serial. | nothing, when read from a mirror |
 
@@ -149,6 +150,7 @@ sequenceDiagram
 
 The enclave keeps nothing between requests, so a crash loses nothing:
 - **Before the bank records the payment:** nothing happened. Bob resends to a fresh instance. Alice's half was sealed to the old instance's key, so she reseals the same content for the new one. Her signature does not change, because `m` names no enclave.
+- **After the result, before settlement:** Bob settles the result he already holds. The bank keeps the old instance's registered key valid long enough to accept it.
 - **After the bank records it:** a retry of the same result gets the stored answer. There is never a second debit.
 - **Deterministic results:** every new key and blind comes from the users, so the same input always gives the same result.
 - **Replaying an old state:** its serial is spent, so the bank refuses it.
@@ -201,7 +203,7 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 
 | Option | Balance rests on | The bank sees who pays whom | Amounts hidden | Role of the TEE | Cost |
 |---|---|---|---|---|---|
-| **Zero-knowledge proofs as in Platypus** | mathematics | no | yes | computes the proofs for weak devices; a break leaks what it saw | one proof per payment |
+| **Zero-knowledge proofs as in Platypus** | mathematics | no | yes | computes the proofs for weak devices; a break leaks what it saw | one proof per party per payment |
 | **Additive commitments with range proofs** | mathematics | yes | yes | not needed for integrity | small proofs, cheap checks |
 | **The same, with the TEE batching payments** | mathematics | only which batch | yes | hides who pays whom inside a batch; a break reveals that pairing | batch rounds, all participants online |
 | **The enclave attests every result** | the TEE vendor and correct code | no | yes | as in round 1 | one attestation per payment |
