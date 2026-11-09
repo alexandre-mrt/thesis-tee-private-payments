@@ -42,4 +42,4 @@ These consequences are derived, not yet validated.
 |---|---|---|---|
 | [Round 1](round-1/README.md) | checked by the bank | checked by the enclave, trusted through its signing key | submitted 2026-11-09 |
 
-In round 1, a leaked enclave key lets an attacker create money from nothing and redeem it, but not take anyone's existing state. Closing that gap is the next design step ([round 1, section 12](round-1/README.md#12-possible-solutions-for-balance-integrity)).
+In round 1, a leaked enclave key lets an attacker create money from nothing and redeem it, but not take anyone's existing state. Closing that gap is the next design step ([round 1, section 11](round-1/README.md#11-possible-solutions-for-balance-integrity)).

@@ -6,9 +6,9 @@
 |---|---|---|
 | [1. Goal](#1-goal-stay-as-close-to-platypus-as-possible) | [5. A payment](#5-a-payment) | [9. If the enclave's memory is read](#9-if-the-enclaves-memory-is-read) |
 | [2. In one paragraph](#2-the-system-in-one-paragraph) | [6. Who checks what](#6-who-checks-what) | [10. What the bank learns](#10-what-the-bank-learns) |
-| [3. Setting and trust](#3-setting-and-trust) | [7. Other operations](#7-other-operations) | [11. Differences from Platypus](#11-differences-from-platypus) |
-| [4. State and ownership](#4-state-and-the-chain-of-ownership) | [8. Crashes](#8-when-the-enclave-crashes) | [12. Possible solutions for balance](#12-possible-solutions-for-balance-integrity) |
-| [Overview map](#overview-map) | [Appendix A: messages](#appendix-a-messages) | [Appendix B: notation](#appendix-b-notation) |
+| [3. Setting and trust](#3-setting-and-trust) | [7. Other operations](#7-other-operations) | [11. Possible solutions for balance](#11-possible-solutions-for-balance-integrity) |
+| [4. State and ownership](#4-state-and-the-chain-of-ownership) | [8. Crashes](#8-when-the-enclave-crashes) | [Overview map](#overview-map) |
+| [Appendix A: messages](#appendix-a-messages) | [Appendix B: notation](#appendix-b-notation) | [Appendix C: differences from Platypus](#appendix-c-differences-from-platypus) |
 
 **TL;DR:** this diagram captures the main idea: one payment from Alice to Bob, checked by the enclave and settled by the bank.
 
@@ -18,28 +18,11 @@ The [payment map](maps/payment.pdf) and the [overview map](maps/overview.pdf) ar
 
 ## 1. Goal: stay as close to Platypus as possible
 
-Round 1 stays **as close to Platypus as possible**. The aim is to replace the two zero-knowledge proofs of a Platypus transaction with one call to a TEE run by the bank, and to change only what that replacement and the foundation require, so that the effect of the replacement can be measured. Section 11 lists every difference.
+Round 1 keeps Platypus's base transaction (Platypus, Sections 3 and 7) and replaces its two zero-knowledge proofs with one call to a TEE run by the bank. Everything else changes only where that replacement or the foundation requires it, so the effect of the replacement can be measured ([Appendix C](#appendix-c-differences-from-platypus) lists every difference). Regulation (Platypus, Section 4) is left for later rounds.
 
-Round 1 keeps the structure of Platypus's base transaction (Platypus, Sections 3 and 7):
-- a user-held state (balance, serial, blind) signed by the bank;
-- one joint transaction between payer and payee, submitted by the payee;
-- the bank's spent-serial check;
-- the public transaction log;
-- issuance from the bank's own account (Section 7);
-- abort by an empty update (Section 7).
+> **One adjustment comes from the foundation: no user secret that can spend funds is ever sent to the enclave.** The version presented on 2026-11-03 gave the enclave the user's serial and blinding keys. Here each serial is a one-time public key and the owner signs each transaction, so the enclave only ever sees signed transactions.
 
-Regulation (Platypus, Section 4) is not part of this round.
-
-> **On top of the replacement, round 1 makes one adjustment required by the foundation: no user secret that can spend funds is ever sent to the enclave.**
->
-> **The version presented on 2026-11-03 gave the enclave the user's serial and blinding keys.** This version makes each serial a one-time public key and has the owner sign each transaction. The enclave only ever sees signed transactions, never a key that can sign.
-
-**Result.**
-- If the enclave's memory is read, the privacy of the payments it is processing is lost.
-- Ownership, no double spend and no fund destruction still hold, because the bank checks them itself.
-- Balance conservation does not hold: a leaked enclave key lets an attacker create money (section 9).
-- The enclave keeps no payment state, so crashes are handled by retries (section 8).
-- The open question is balance integrity (section 12).
+**Result.** If the enclave's memory is read, the bank still enforces ownership, no double spend and no fund destruction, but the privacy of the requests read is lost and a leaked enclave key can create money (section 9). Crashes are handled by retries (section 8). Balance integrity is the open question (section 11).
 
 ## 2. The system in one paragraph
 
@@ -202,22 +185,7 @@ While the enclave works, and with recovery done by downloading the whole log:
 
 Each serial is a fresh key used once, so the bank cannot link two payments by the same user.
 
-## 11. Differences from Platypus
-
-| | Platypus | Round 1 |
-|---|---|---|
-| Validity of a transaction | two zero-knowledge proofs, one per party, bound by a transaction commitment | one enclave check of the whole transaction, and one signed result |
-| Serial | a pseudorandom chain derived from a long-term key | a one-time public key derived from the seed |
-| Ownership of a state | proven inside the zero-knowledge proof | the owner signs with the serial's one-time key, and the bank verifies it |
-| Binding the two sides | the transaction commitment; the payer starts | both owners sign `m`; the payee starts with a request, so the payer learns the payee's serial before settlement |
-| Payer's private data | hidden inside her proof | sealed to the attested enclave, so the payee cannot read it |
-| Balance conservation | guaranteed by the proofs: mathematics plus a trusted setup run by the bank (Platypus, Section 3) | guaranteed by the enclave's checks and its key |
-| Abort | the payer's empty update | either party's refresh, checked by the enclave |
-| Extra pieces needed by the TEE | none | attestation and enclave registration, resealing after a crash, uniform refusals, idempotent settlement |
-| Public log | recent transactions only | every entry, so recovery can walk the chain from `pk_0` |
-| User-held state, spent-serial check, issuance | as in the paper | the same (issuance adds an issuance key, section 7) |
-
-## 12. Possible solutions for balance integrity
+## 11. Possible solutions for balance integrity
 
 **The goal:** the bank checks balance conservation itself, as it already checks ownership, while keeping Platypus's privacy. Without a cryptographic proof, the bank can only take a TEE's word on balances. The options either add a proof, or move that trust from the enclave's own key to the hardware vendor. For discussion:
 
@@ -266,3 +234,18 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 | `Sign`, `sig` | an owner's signature with a one-time key |
 | `Enc(channel key, …)` | encryption to the channel key of an attested enclave |
 | `B_max` | the maximum balance of a user's state |
+
+## Appendix C: differences from Platypus
+
+| | Platypus | Round 1 |
+|---|---|---|
+| Validity of a transaction | two zero-knowledge proofs, one per party, bound by a transaction commitment | one enclave check of the whole transaction, and one signed result |
+| Serial | a pseudorandom chain derived from a long-term key | a one-time public key derived from the seed |
+| Ownership of a state | proven inside the zero-knowledge proof | the owner signs with the serial's one-time key, and the bank verifies it |
+| Binding the two sides | the transaction commitment; the payer starts | both owners sign `m`; the payee starts with a request, so the payer learns the payee's serial before settlement |
+| Payer's private data | hidden inside her proof | sealed to the attested enclave, so the payee cannot read it |
+| Balance conservation | guaranteed by the proofs: mathematics plus a trusted setup run by the bank (Platypus, Section 3) | guaranteed by the enclave's checks and its key |
+| Abort | the payer's empty update | either party's refresh, checked by the enclave |
+| Extra pieces needed by the TEE | none | attestation and enclave registration, resealing after a crash, uniform refusals, idempotent settlement |
+| Public log | recent transactions only | every entry, so recovery can walk the chain from `pk_0` |
+| User-held state, spent-serial check, issuance | as in the paper | the same (issuance adds an issuance key, section 7) |
