@@ -168,7 +168,7 @@ Suppose an attacker can read everything the enclave holds or receives: the openi
 | A payment cannot be redirected or changed | **yes** | The owners sign the exact new states (`m`). An exact replay gets the stored answer (B1); anything else spending the serial is refused (B4). |
 | No double spend | **yes** | The bank's spent set (B4). |
 | Nobody can burn another user's state | **yes** | Burning a serial needs its owner's signature. |
-| **Balance:** no money created | **no** | The bank cannot see balances, so E1, E2 and E4 are checked only by the enclave. With its signing key, an attacker signs results for states that never existed, with any balance, and can then redeem them at the bank. It still cannot take anyone's existing state. |
+| **Balance:** no money created | **no** | The bank cannot see balances, so E1, E2 and E4 are checked only by the enclave. With its signing key, an attacker signs results for states that never existed, with any balance, and can then redeem them at the bank. Enroll and refresh are exposed the same way: a signed enrollment can carry any balance, and a signed refresh can raise one. It still cannot take anyone's existing state. |
 | Privacy toward the bank | **no**, for the requests read | For each payment it reads, the attacker learns the amount and both balances, and links it to the previous and the next payment of both participants, revealing the balances those payments left. An enroll it reads reveals `pk_0`, linking it to the user's first payment; a refresh reveals the balance and the next serial. Each channel key serves one request and is then erased, so requests not read during the break stay private. |
 
 ## 10. What the bank learns
@@ -249,3 +249,4 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 | Extra pieces needed by the TEE | none | attestation and enclave registration, resealing after a crash, uniform refusals, idempotent settlement |
 | Public log | recent transactions only | every entry, so recovery can walk the chain from `pk_0` |
 | User-held state, spent-serial check, issuance | as in the paper | the same (issuance adds an issuance key, section 7) |
+| Regulation | holding limit and receiving limit per epoch, checked in the proofs | holding limit `B_max` only (E4); receiving limits are left for a later round |
