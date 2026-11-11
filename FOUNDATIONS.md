@@ -51,9 +51,26 @@ These consequences are derived, not yet validated.
 - **Ownership is cheap to keep on the bank's side.** Owners sign their own transactions with keys that never leave their devices, and the bank verifies those signatures.
 - **The TEE's role is privacy and cost.** It can open states, hide who pays whom, or compute proofs on behalf of weak devices, provided the proof's witness holds no long-term spending key (Platypus's witness holds one). A break then leaks what it saw, and the bank's checks are unaffected.
 
-## Where the designs stand
-| Design | Ownership | Balance | Status |
-|---|---|---|---|
-| [Round 1](round-1/README.md) | checked by the bank | checked by the enclave, trusted through its signing key | submitted 2026-11-09 |
+## Round 1 in Platypus's terms
+Platypus groups integrity under **transaction integrity** (Section 5): **transaction unforgeability** (Claim 5.1: only authorized parties spend their funds, and values and recipients cannot be changed; this includes spending an account state that never came out of a transaction the bank accepted) and **balance invariance** (Claim 5.2: no funds are spent twice and the supply never grows). Claim 5.4 adds that nobody can invalidate another client's state, Claim 5.5 that no transaction breaks a regulation, and Claim 5.3 gives privacy as transaction indistinguishability.
 
-In round 1, a leaked enclave key lets an attacker create money from nothing (through a payment, an enrollment or a refresh) and redeem it, but not take anyone's existing state. This holds against both attacker classes, because results reach the bank through the payee, signed by the enclave's key. Closing that gap is the next design step ([round 1, section 11](round-1/README.md#11-possible-solutions-for-balance-integrity)).
+Round 1 as revised at the advisor meeting of 2026-11-10 (the enclave runs inside the bank, results never leave the bank's machine, submitted for validation) splits these into two kinds of integrity:
+- **Ownership integrity:** nobody but the owner can spend, redirect or change a payment of a state. The bank checks it itself, with the owners' signatures under one-time keys that never reach the enclave.
+- **Balance integrity:** no money is printed. No state appears that the bank never issued, no balance is forged, every payment moves exactly its amount, and nothing is spent twice. The double-spend part is the bank's spent set; the rest rests on the enclave's checks, accepted only from the bank's own enclave over its own channel.
+
+| Property | Platypus | Checked by | Remote reader | Host-level reader |
+|---|---|---|---|---|
+| Only the owner spends; amount and payee fixed | unforgeability (5.1) | bank: owner signatures (B2) | holds | holds |
+| No spend of a state the bank never issued (forged balance) | unforgeability (5.1), its "non-existing account" case | enclave (E1), accepted over the bank's channel | holds | **lost** |
+| No money printed: each payment moves exactly its amount | balance invariance (5.2) | enclave (E2, E4), same channel | holds | **lost** |
+| No double spend | balance invariance (5.2) | bank: spent set (B4) | holds | holds |
+| Nobody invalidates another user's state | Claim 5.4 | bank: burning needs the owner's signature | holds | holds |
+| Holding limit respected | Claim 5.5 (holding limit only; no receiving limit yet) | enclave (E4) | holds | **lost** |
+| Privacy toward the bank | indistinguishability (5.3), bank only | enclave | lost for the requests read | lost for the requests read |
+
+Ownership integrity never depends on the enclave. Balance integrity survives a remote reader because the bank accepts results only from its own enclave, in answer to its own nonce; it is lost to a host-level reader, which can impersonate the enclave on that channel. Closing that last gap needs a check the bank verifies itself ([round 1, section 11](round-1/README.md#11-possible-solutions-for-balance-integrity)).
+
+## Where the designs stand
+| Design | Ownership integrity | Balance integrity | Status |
+|---|---|---|---|
+| [Round 1](round-1/README.md) | checked by the bank | checked by the enclave inside the bank; holds against a remote reader, not a host-level one | submitted 2026-11-09, revised 2026-11-10 |
