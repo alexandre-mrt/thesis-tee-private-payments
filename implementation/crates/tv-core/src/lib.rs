@@ -9,6 +9,7 @@ pub mod error;
 pub mod result;
 pub mod sig;
 pub mod types;
+pub mod wire;
 
 pub use cbor::{decode_cbor, encode_cbor};
 pub use commit::{commitment, enroll_digest, manifest_digest, pay_digest, refresh_digest};
@@ -21,6 +22,11 @@ pub use sig::{
 };
 pub use types::{
     BankKeys, Bytes32, Manifest, Opening, SideKind, SignedState, State, random_bytes32,
+};
+pub use wire::{
+    BankRequest, BankResponse, CheckOp, EnclaveRequest, EnclaveResponse, EnrollRequest,
+    EnrollSecret, LogEntry, OpKind, PayPublic, PaySecret, Receive, RefreshRequest, RefreshSecret,
+    SealedBlob,
 };
 
 pub const B_MAX: u64 = 1_000_000;
