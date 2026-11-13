@@ -6,6 +6,7 @@ pub mod flight;
 pub mod genesis;
 pub mod index;
 pub mod inflight;
+pub mod init;
 pub mod journal;
 pub mod keys;
 pub mod ledger;
@@ -18,6 +19,10 @@ pub use commit::{Committer, SharedStore};
 pub use error::{BankError, LinkError};
 pub use genesis::{GENESIS_FILE, read_genesis};
 pub use index::{Index, MAX_RANGE, answer_for};
+pub use init::{
+    BANK_WALLET_FILE, DEFAULT_RESERVE, ENCLAVE_PK_FILE, ISSUANCE_KEY_FILE, STATE_KEY_FILE,
+    bank_wallet_path, init, read_keys, require_complete,
+};
 pub use ledger::{
     ISSUANCE_LEDGER_FILE, IssuanceRecord, issue, ledger_path, read_issuances, record_issuance,
 };
