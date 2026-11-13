@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
+mod enclave;
 mod party;
 mod profile;
+mod settle;
 mod setup;
 mod stats;
 mod store;
@@ -17,13 +19,31 @@ use crate::stats::{ms, rate_line};
 
 const UNKNOWN_CPU: &str = "unknown";
 const GROUP_WRITERS: usize = 64;
+const SETTLE_OVERSUBSCRIPTION: usize = 4;
 const PROFILE_SCALE: usize = 10;
 
 #[derive(Debug, Parser)]
 #[command(name = "tv-bench", version, about = "tee-pay-v2 benchmarks")]
 struct Args {
+    #[arg(
+        long,
+        default_value_t = 1000,
+        help = "Payments per latency and settle run"
+    )]
+    payments: usize,
+    #[arg(
+        long,
+        default_value_t = 4096,
+        help = "Enclave checks per throughput run"
+    )]
+    checks: usize,
     #[arg(long, default_value_t = 1000, help = "Store appends per run")]
     appends: usize,
+    #[arg(
+        long,
+        help = "Concurrent payer/payee pairs for the settle run (default: cores)"
+    )]
+    pairs: Option<usize>,
     #[arg(
         long,
         default_value_t = 200,
@@ -69,6 +89,18 @@ fn sync_benches(args: &Args, root: &Path) -> Result<()> {
     for (label, per_op) in profile::primitives(args.iterations * PROFILE_SCALE)? {
         println!("{label}: {}", ms(per_op));
     }
+    println!("== enclave check throughput (in-process, Pay, mock attestation)");
+    for threads in [1, cores()] {
+        let run = enclave::check_throughput(args.checks, threads)?;
+        println!(
+            "{}",
+            rate_line(
+                &format!("checks with {} thread(s)", run.threads),
+                run.checks,
+                run.elapsed
+            )
+        );
+    }
     println!("== bank store (log.jsonl)");
     let elapsed = store::append_per_op(root, args.appends)?;
     println!(
@@ -88,6 +120,20 @@ async fn in_process_benches(args: &Args, root: &Path) -> Result<()> {
                 &format!("stage + commit with {writers} concurrent writer(s)"),
                 count,
                 elapsed
+            )
+        );
+    }
+    println!("== bank settle throughput (in-process bank and enclave, full Receive path)");
+    let pairs = args.pairs.unwrap_or_else(cores);
+    for pairs in [1, pairs, pairs * SETTLE_OVERSUBSCRIPTION] {
+        let per_pair = args.payments.div_ceil(pairs);
+        let run = settle::settle_throughput(root, pairs, per_pair).await?;
+        println!(
+            "{}",
+            rate_line(
+                &format!("payments with {} concurrent pair(s)", run.pairs),
+                run.payments,
+                run.elapsed
             )
         );
     }
