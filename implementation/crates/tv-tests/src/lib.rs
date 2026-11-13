@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod link;
+pub mod proxy;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -19,6 +20,7 @@ use tv_core::{
 use tv_enclave::Enclave;
 
 pub use link::{Mode, TestLink};
+pub use proxy::{RecordingProxy, request_kind};
 
 pub const RESERVE: u64 = 1_000_000_000;
 
