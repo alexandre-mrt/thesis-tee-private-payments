@@ -158,3 +158,6 @@ pub fn check_refresh(
         sides: vec![opening.side],
     })
 }
+
+#[cfg(test)]
+mod tests;
