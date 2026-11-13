@@ -1,0 +1,20 @@
+[package]
+name = "tv-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "tee-pay-v2 primitives: key derivation, commitments, digests, signatures, wire messages."
+
+[dependencies]
+pt-tee.workspace = true
+serde.workspace = true
+serde_bytes.workspace = true
+ciborium.workspace = true
+sha2.workspace = true
+hkdf.workspace = true
+ed25519-dalek.workspace = true
+rand.workspace = true
+hex.workspace = true
+thiserror.workspace = true

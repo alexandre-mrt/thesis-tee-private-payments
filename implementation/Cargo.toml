@@ -3,6 +3,7 @@ resolver = "3"
 members = [
   "crates/pt-tee",
   "crates/pt-host",
+  "crates/tv-core",
 ]
 
 [workspace.package]
@@ -14,6 +15,7 @@ publish = false
 
 [workspace.dependencies]
 pt-tee = { path = "crates/pt-tee" }
+tv-core = { path = "crates/tv-core" }
 aws-nitro-enclaves-nsm-api = "0.5"
 aws-nitro-enclaves-cose = "0.6"
 x509-parser = { version = "0.18", features = ["verify"] }
