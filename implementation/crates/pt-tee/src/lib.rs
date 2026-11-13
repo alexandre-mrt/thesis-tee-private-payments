@@ -18,6 +18,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod channel;
 pub mod framing;
 
 /// Protocol tag. Prefix of the attestation `user_data` and of the HKDF infos.
