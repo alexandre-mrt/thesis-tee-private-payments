@@ -4,13 +4,17 @@ use std::time::Duration;
 
 pub mod cbor;
 pub mod commit;
+pub mod derive;
 pub mod error;
+pub mod result;
 pub mod sig;
 pub mod types;
 
 pub use cbor::{decode_cbor, encode_cbor};
 pub use commit::{commitment, enroll_digest, manifest_digest, pay_digest, refresh_digest};
+pub use derive::{Seed, derive_r, derive_sk};
 pub use error::CoreError;
+pub use result::{EnclaveResult, sign_result, verify_result, verify_result_with};
 pub use sig::{
     BankVerifiers, SIG_LEN, Signature, SigningKey, VerifyingKey, sign_digest, sign_state,
     verify_digest, verify_state,
