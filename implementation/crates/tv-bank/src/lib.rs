@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod flight;
 pub mod index;
+pub mod journal;
 pub mod keys;
 
 pub use error::{BankError, LinkError};
