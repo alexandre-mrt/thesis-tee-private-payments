@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod bank;
 pub mod commit;
 pub mod error;
 pub mod flight;
@@ -15,6 +16,7 @@ pub mod quota;
 pub mod registry;
 pub mod store;
 
+pub use bank::{BANK_SOURCE, Bank, Outcome, Policy};
 pub use commit::{Committer, SharedStore};
 pub use error::{BankError, LinkError};
 pub use genesis::{GENESIS_FILE, read_genesis};
