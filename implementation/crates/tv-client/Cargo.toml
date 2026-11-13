@@ -7,6 +7,10 @@ license.workspace = true
 publish.workspace = true
 description = "tee-pay-v2 client: seed wallet, bank client, payment flows, recovery, tv-cli."
 
+[[bin]]
+name = "tv-cli"
+path = "src/bin/tv-cli/main.rs"
+
 [dependencies]
 tv-core.workspace = true
 pt-tee.workspace = true
