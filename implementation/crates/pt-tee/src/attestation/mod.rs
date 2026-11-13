@@ -7,6 +7,8 @@
 
 pub mod doc;
 pub mod mock;
+pub mod root;
+pub mod verify;
 
 #[cfg(target_os = "linux")]
 pub mod nsm;
@@ -15,6 +17,7 @@ pub use doc::{AttestationDoc, Digest};
 pub use mock::MockProvider;
 #[cfg(target_os = "linux")]
 pub use nsm::NsmProvider;
+pub use verify::{AttestationVerifier, AttestedEnclave, VerifyError, VerifyRequest};
 
 use crate::PROTOCOL_TAG;
 
