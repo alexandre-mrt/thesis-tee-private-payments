@@ -109,3 +109,73 @@ fn verify_bundle_at(
         .try_into()
         .map_err(|_| ClientError::Attestation("bad channel key length".to_owned()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pcr0_must_be_48_bytes_of_hex() {
+        assert_eq!(parse_pcr0(&"AB".repeat(48)).unwrap(), "ab".repeat(48));
+        assert!(parse_pcr0("zz").unwrap_err().contains("not hex"));
+        assert!(
+            parse_pcr0(&"ab".repeat(32))
+                .unwrap_err()
+                .contains("32 bytes")
+        );
+    }
+
+    const SECOND_MS: u128 = 1000;
+
+    #[test]
+    fn freshness_window_is_the_channel_key_lifetime() {
+        let now = 1_800_000_000_000u128;
+        let issued = |ms: u128| u64::try_from(ms).unwrap();
+        assert!(check_fresh(issued(now), now).is_ok());
+        assert!(check_fresh(issued(now - MAX_KEY_AGE.as_millis() + SECOND_MS), now).is_ok());
+        assert!(matches!(
+            check_fresh(issued(now - MAX_KEY_AGE.as_millis()), now),
+            Err(ClientError::StaleAttestation { .. })
+        ));
+        assert!(check_fresh(issued(now + ATTEST_CLOCK_SKEW.as_millis()), now).is_ok());
+        assert!(matches!(
+            check_fresh(issued(now + ATTEST_CLOCK_SKEW.as_millis() + 1), now),
+            Err(ClientError::FutureAttestation { ahead_ms }) if ahead_ms == ATTEST_CLOCK_SKEW.as_millis() + 1
+        ));
+    }
+
+    #[test]
+    fn trust_rules() {
+        let loopback = Endpoint::tcp("127.0.0.1:7000").unwrap();
+        let remote = Endpoint::tcp("10.0.0.1:7000").unwrap();
+        let mock = Trust {
+            pcr0_hex: None,
+            allow_mock: true,
+        };
+        assert!(mock.verifier(&loopback).is_ok());
+        assert!(matches!(
+            mock.verifier(&remote),
+            Err(ClientError::MockRequiresLoopback)
+        ));
+        assert!(matches!(
+            Trust {
+                pcr0_hex: Some("ab".repeat(48)),
+                allow_mock: true,
+            }
+            .verifier(&loopback),
+            Err(ClientError::MockWithPin)
+        ));
+        assert!(matches!(
+            Trust::default().verifier(&remote),
+            Err(ClientError::Pcr0Required)
+        ));
+        assert!(
+            Trust {
+                pcr0_hex: Some("ab".repeat(48)),
+                allow_mock: false,
+            }
+            .verifier(&remote)
+            .is_ok()
+        );
+    }
+}

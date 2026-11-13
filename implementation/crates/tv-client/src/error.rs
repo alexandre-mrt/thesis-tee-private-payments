@@ -201,3 +201,114 @@ impl ClientError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pending_guidance_names_only_commands_that_clear_that_kind() {
+        let zero = [0u8; 32];
+        let request = Pending::Request {
+            v: 1,
+            com_next: zero,
+            channel_pk: zero,
+            result_pk: zero,
+        };
+        let pay = Pending::Pay {
+            v: 1,
+            pk_b: zero,
+            com_b_next: zero,
+            com_a_next: zero,
+            digest: zero,
+        };
+        let refresh = Pending::Refresh {
+            com_next: zero,
+            digest: zero,
+        };
+        let enroll = Pending::Enroll {
+            com0: zero,
+            digest: zero,
+        };
+        for blocked in [
+            ClientError::pending_blocks(&request),
+            ClientError::refresh_blocked(&request),
+        ] {
+            let text = blocked.to_string();
+            assert!(text.contains("tv-cli receive --offer"), "{text}");
+            assert!(!text.contains("finish"), "{text}");
+        }
+        let text = ClientError::pending_blocks(&request).to_string();
+        assert!(text.contains("tv-cli refresh --force"), "{text}");
+        let text = ClientError::pending_blocks(&pay).to_string();
+        assert!(text.contains("tv-cli finish") && text.contains("refresh --force"));
+        assert!(
+            ClientError::refresh_blocked(&pay)
+                .to_string()
+                .contains("tv-cli finish")
+        );
+        let text = ClientError::pending_blocks(&refresh).to_string();
+        assert!(text.contains("complete it with `tv-cli refresh`"), "{text}");
+        let text = ClientError::pending_blocks(&enroll).to_string();
+        assert!(text.ends_with("complete it with `tv-cli enroll`"), "{text}");
+        assert!(!text.contains("finish"), "{text}");
+    }
+
+    #[test]
+    fn unavailable_names_the_retry_of_its_own_operation() {
+        let text = ClientError::Unavailable {
+            retry: RETRY_ENROLL,
+        }
+        .to_string();
+        assert!(text.ends_with("rerun `tv-cli enroll`"), "{text}");
+        assert!(!text.contains("reseal"), "{text}");
+        let text = ClientError::Unavailable {
+            retry: RETRY_REFRESH,
+        }
+        .to_string();
+        assert!(text.contains("rerun `tv-cli refresh`"), "{text}");
+        assert!(!text.contains("reseal"), "{text}");
+        let text = ClientError::Unavailable {
+            retry: RETRY_RECEIVE,
+        }
+        .to_string();
+        assert!(text.contains("re-attest and reseal"), "{text}");
+    }
+
+    #[test]
+    fn describe_adds_only_causes_the_message_does_not_already_carry() {
+        let refused = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        let transport = ClientError::Transport(TransportError::Io {
+            endpoint: pt_tee::transport::Endpoint::tcp("127.0.0.1:1").unwrap(),
+            source: refused,
+        });
+        assert!(transport.is_connection_refused());
+        let text = describe(&transport);
+        assert_eq!(text.matches("onnection refused").count(), 1, "{text}");
+        let chained = anyhow_like("opening the bank", ClientError::NotEnrolled);
+        assert_eq!(
+            describe(&chained),
+            "opening the bank: wallet is not enrolled"
+        );
+        assert!(!ClientError::Refused.is_connection_refused());
+    }
+
+    #[derive(Debug)]
+    struct Context(&'static str, ClientError);
+
+    impl std::fmt::Display for Context {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.0)
+        }
+    }
+
+    impl std::error::Error for Context {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.1)
+        }
+    }
+
+    fn anyhow_like(context: &'static str, err: ClientError) -> Context {
+        Context(context, err)
+    }
+}
