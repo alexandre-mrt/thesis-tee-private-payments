@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod client;
 mod enclave;
+mod latency;
 mod party;
 mod profile;
 mod settle;
@@ -15,7 +17,7 @@ use std::process::Command;
 use anyhow::Result;
 use clap::Parser;
 
-use crate::stats::{ms, rate_line};
+use crate::stats::{line, ms, percentiles, rate_line};
 
 const UNKNOWN_CPU: &str = "unknown";
 const GROUP_WRITERS: usize = 64;
@@ -84,6 +86,12 @@ fn cpu_brand() -> String {
         .unwrap_or_else(|| UNKNOWN_CPU.to_owned())
 }
 
+fn print_percentiles(label: &str, samples: &[std::time::Duration]) {
+    if let Some(p) = percentiles(samples) {
+        println!("{}", line(label, &p));
+    }
+}
+
 fn sync_benches(args: &Args, root: &Path) -> Result<()> {
     println!("== primitive costs (mean per operation)");
     for (label, per_op) in profile::primitives(args.iterations * PROFILE_SCALE)? {
@@ -140,6 +148,37 @@ async fn in_process_benches(args: &Args, root: &Path) -> Result<()> {
     Ok(())
 }
 
+async fn loopback_benches(args: &Args, root: &Path) -> Result<()> {
+    println!("== loopback TCP latency (user -> bank -> enclave, sequential payments)");
+    let lb = setup::start_loopback(root, "latency").await?;
+    let lat = latency::payment_latency(&lb, args.payments).await?;
+    print_percentiles("attest round trip", &lat.attest);
+    print_percentiles("build offer and payee blob", &lat.build);
+    print_percentiles("receive round trip", &lat.receive);
+    print_percentiles("payment total", &lat.total);
+    drop(lb);
+    let lb = setup::start_loopback(root, "wallet-flow").await?;
+    let flow = latency::wallet_flow_latency(&lb, args.payments).await?;
+    print_percentiles(
+        "tv-cli flow request+pay+receive+finish with wallet files",
+        &flow,
+    );
+    drop(lb);
+    println!("== client-side cost");
+    let lb = setup::start_loopback(root, "client-cost").await?;
+    let cost = client::client_cost(&lb, args.iterations).await?;
+    print_percentiles("verify attestation bundle", &cost.verify);
+    print_percentiles("seal payer opening", &cost.seal);
+    print_percentiles("build offer (prepare_pay)", &cost.offer);
+    drop(lb);
+    println!("== message sizes");
+    let lb = setup::start_loopback(root, "sizes").await?;
+    for (label, bytes) in client::message_sizes(&lb).await? {
+        println!("{label}: {bytes} bytes");
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     let workspace = Workspace::create()?;
@@ -149,6 +188,7 @@ fn main() -> Result<()> {
         .enable_all()
         .build()?;
     runtime.block_on(async {
-        in_process_benches(&args, &workspace.0).await
+        in_process_benches(&args, &workspace.0).await?;
+        loopback_benches(&args, &workspace.0).await
     })
 }
