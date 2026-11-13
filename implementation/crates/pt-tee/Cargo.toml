@@ -1,0 +1,29 @@
+[package]
+name = "pt-tee"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Attestation (NSM, mock, verifier), secure channel and CBOR framing for platypus-tee. Generic: no pt-core, no arkworks."
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_bytes.workspace = true
+ciborium.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hkdf.workspace = true
+x25519-dalek.workspace = true
+chacha20poly1305.workspace = true
+rand.workspace = true
+hex.workspace = true
+aws-nitro-enclaves-cose.workspace = true
+x509-parser.workspace = true
+openssl.workspace = true
+
+# The NSM device and vsock only exist inside a Linux guest (Nitro Enclave or parent).
+[target.'cfg(target_os = "linux")'.dependencies]
+aws-nitro-enclaves-nsm-api.workspace = true
+tokio-vsock.workspace = true

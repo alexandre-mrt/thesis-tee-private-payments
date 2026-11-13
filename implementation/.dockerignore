@@ -1,0 +1,10 @@
+target
+**/target-*
+.git
+.env
+.env.*
+keys
+*.pem.key
+*.eif
+pcrs.json
+.claude

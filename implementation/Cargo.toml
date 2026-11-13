@@ -1,0 +1,48 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/pt-tee",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+pt-tee = { path = "crates/pt-tee" }
+aws-nitro-enclaves-nsm-api = "0.5"
+aws-nitro-enclaves-cose = "0.6"
+x509-parser = { version = "0.18", features = ["verify"] }
+openssl = "=0.10.81"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time", "signal", "sync"] }
+tokio-vsock = "0.7"
+x25519-dalek = { version = "3", features = ["static_secrets"] }
+chacha20poly1305 = "0.11"
+hkdf = "0.13"
+sha2 = "0.11"
+ed25519-dalek = { version = "=2.1.1", features = ["rand_core"] }
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+ciborium = "0.2"
+serde_json = "1"
+hex = "0.4"
+thiserror = "2"
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+zeroizing-alloc = "0.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
