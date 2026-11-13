@@ -1949,6 +1949,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tv-tests"
+version = "0.1.0"
+dependencies = [
+ "ciborium",
+ "hex",
+ "pt-tee",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tv-bank",
+ "tv-client",
+ "tv-core",
+ "tv-enclave",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

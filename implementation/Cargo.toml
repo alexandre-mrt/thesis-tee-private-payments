@@ -7,6 +7,7 @@ members = [
   "crates/tv-enclave",
   "crates/tv-bank",
   "crates/tv-client",
+  "crates/tv-tests",
 ]
 
 [workspace.package]

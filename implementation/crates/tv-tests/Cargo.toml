@@ -1,0 +1,23 @@
+[package]
+name = "tv-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "tee-pay-v2 integration tests: bank and mock enclave in-process, properties P1 to P5."
+
+[dependencies]
+tv-core.workspace = true
+tv-enclave = { workspace = true, features = ["test-hooks"] }
+tv-bank.workspace = true
+tv-client.workspace = true
+pt-tee.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+ciborium.workspace = true
