@@ -46,3 +46,45 @@ pub fn aws_nitro_root_g1_der() -> Result<Vec<u8>, VerifyError> {
     }
     Ok(der)
 }
+
+#[cfg(test)]
+mod tests {
+    use x509_parser::parse_x509_certificate;
+
+    use super::*;
+
+    #[test]
+    fn embedded_root_matches_pinned_fingerprint() {
+        let der = pem_to_der(AWS_NITRO_ROOT_G1_PEM.as_bytes()).unwrap();
+        assert_eq!(sha256_hex(&der), AWS_NITRO_ROOT_G1_SHA256_HEX);
+        assert_eq!(aws_nitro_root_g1_der().unwrap(), der);
+    }
+
+    #[test]
+    fn embedded_root_is_a_self_signed_p384_ca_valid_until_2049() {
+        let der = aws_nitro_root_g1_der().unwrap();
+        let (rem, cert) = parse_x509_certificate(&der).unwrap();
+        assert!(rem.is_empty());
+        assert!(cert.is_ca());
+        assert_eq!(cert.subject(), cert.issuer());
+        cert.verify_signature(None).unwrap();
+        assert!(cert.subject().to_string().contains("aws.nitro-enclaves"));
+        // Not before 2019-10-28, not after 2049-10-28 (UTC).
+        assert_eq!(cert.validity().not_before.timestamp(), 1_572_269_285);
+        assert_eq!(cert.validity().not_after.timestamp(), 2_519_044_085);
+        assert!(cert.validity().is_valid());
+    }
+
+    #[test]
+    fn pem_helpers_reject_garbage() {
+        assert!(matches!(
+            pem_to_der(b"not pem"),
+            Err(VerifyError::RootPem(_))
+        ));
+        let key_block = b"-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n";
+        assert!(matches!(
+            pem_to_der(key_block),
+            Err(VerifyError::RootPem(_))
+        ));
+    }
+}

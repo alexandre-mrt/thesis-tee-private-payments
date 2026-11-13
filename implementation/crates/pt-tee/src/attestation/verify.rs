@@ -384,3 +384,158 @@ fn check_binding(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::mock::MockProvider;
+    use super::super::{AttestationInputs, AttestationProvider};
+    use super::*;
+    use crate::PROTOCOL_TAG;
+
+    const DIGEST: [u8; 32] = [0x11; 32];
+    const NONCE: [u8; 32] = [0x22; 32];
+    const PK: [u8; 32] = [0x33; 32];
+
+    fn mock_doc(provider: &MockProvider) -> Vec<u8> {
+        let user_data = super::super::user_data_for(&DIGEST);
+        provider
+            .attest(&AttestationInputs {
+                nonce: &NONCE,
+                user_data: &user_data,
+                public_key: &PK,
+            })
+            .unwrap()
+    }
+
+    fn request<'a>(nonce: &'a [u8], digest: &'a [u8]) -> VerifyRequest<'a> {
+        VerifyRequest {
+            nonce,
+            user_data_prefix: PROTOCOL_TAG,
+            user_data_digest: digest,
+            now_unix_secs: 1_700_000_000,
+        }
+    }
+
+    #[test]
+    fn aws_root_verifier_builds_and_rejects_mock_by_default() {
+        let verifier = AttestationVerifier::with_aws_root().unwrap();
+        let doc = mock_doc(&MockProvider::new());
+        assert!(matches!(
+            verifier.verify(&doc, &request(&NONCE, &DIGEST)),
+            Err(VerifyError::MockRejected)
+        ));
+    }
+
+    #[test]
+    fn mock_accepted_only_with_allow_mock_and_matching_fields() {
+        let verifier = AttestationVerifier::with_aws_root()
+            .unwrap()
+            .allow_mock(true);
+        let doc = mock_doc(&MockProvider::new());
+        let attested = verifier.verify(&doc, &request(&NONCE, &DIGEST)).unwrap();
+        assert!(attested.mock);
+        assert_eq!(attested.public_key, PK);
+        assert_eq!(attested.pcrs.get(&0).unwrap(), &vec![0u8; 48]);
+
+        assert!(matches!(
+            verifier.verify(&doc, &request(&[0u8; 32], &DIGEST)),
+            Err(VerifyError::NonceMismatch)
+        ));
+        assert!(matches!(
+            verifier.verify(&doc, &request(&NONCE, &[0u8; 32])),
+            Err(VerifyError::UserDataMismatch)
+        ));
+        let strict = verifier.clone().expect_pcr0(vec![0xAA; 48]);
+        assert!(matches!(
+            strict.verify(&doc, &request(&NONCE, &DIGEST)),
+            Err(VerifyError::Pcr0Mismatch { .. })
+        ));
+        let matching = mock_doc(&MockProvider::with_pcr0(vec![0xAA; 48]));
+        assert!(strict.verify(&matching, &request(&NONCE, &DIGEST)).is_ok());
+        assert!(matches!(
+            verifier.verify(
+                b"PLATYPUS-TEE-MOCK-ATTESTATION-INSECURE/v1\n\xff",
+                &request(&NONCE, &DIGEST)
+            ),
+            Err(VerifyError::MockMalformed(_))
+        ));
+    }
+
+    #[test]
+    fn garbage_is_not_a_cose_document() {
+        let verifier = AttestationVerifier::with_aws_root()
+            .unwrap()
+            .expect_pcr0(vec![0xAB; 48]);
+        for doc in [&b""[..], b"\x00", b"hello", b"\x84\x40\xa0\x40\x40"] {
+            let err = verifier.verify(doc, &request(&NONCE, &DIGEST)).unwrap_err();
+            assert!(
+                matches!(err, VerifyError::Cose(_) | VerifyError::Payload(_)),
+                "{doc:02x?}: {err}"
+            );
+        }
+    }
+
+    /// H-1: a non-mock document is never looked at without a pinned, non-zero PCR0.
+    #[test]
+    fn signed_documents_require_a_non_zero_pcr0_pin() {
+        let unpinned = AttestationVerifier::with_aws_root().unwrap();
+        assert!(unpinned.expected_pcr0().is_none());
+        assert!(matches!(
+            unpinned.verify(b"\x84\x40\xa0\x40\x40", &request(&NONCE, &DIGEST)),
+            Err(VerifyError::Pcr0NotPinned)
+        ));
+        let zero = unpinned.clone().expect_pcr0(vec![0u8; 48]);
+        assert!(matches!(
+            zero.verify(b"\x84\x40\xa0\x40\x40", &request(&NONCE, &DIGEST)),
+            Err(VerifyError::Pcr0Zero)
+        ));
+        // Mock documents are unaffected by the pin requirement (unsigned, opt-in).
+        let doc = mock_doc(&MockProvider::new());
+        assert!(matches!(
+            unpinned.verify(&doc, &request(&NONCE, &DIGEST)),
+            Err(VerifyError::MockRejected)
+        ));
+        assert!(
+            unpinned
+                .allow_mock(true)
+                .verify(&doc, &request(&NONCE, &DIGEST))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn pcr0_hex_and_root_validation() {
+        let v = AttestationVerifier::with_aws_root().unwrap();
+        assert!(matches!(
+            v.clone().expect_pcr0_hex("zz"),
+            Err(VerifyError::Pcr0Hex(_))
+        ));
+        let v = v.expect_pcr0_hex(&"ab".repeat(48)).unwrap();
+        assert_eq!(v.expected_pcr0.as_deref(), Some(&[0xAB; 48][..]));
+        assert!(matches!(
+            AttestationVerifier::with_root_der(vec![0x30, 0x00]),
+            Err(VerifyError::RootInvalid(_))
+        ));
+        assert!(matches!(
+            AttestationVerifier::with_root_pem(b"junk"),
+            Err(VerifyError::RootPem(_))
+        ));
+    }
+
+    #[test]
+    fn binding_check_is_exact() {
+        let req = request(&NONCE, &DIGEST);
+        let good = super::super::user_data_for(&DIGEST);
+        assert!(check_binding(Some(&NONCE), Some(&good), &req).is_ok());
+        assert!(check_binding(None, Some(&good), &req).is_err());
+        assert!(check_binding(Some(&NONCE), None, &req).is_err());
+        let mut longer = good.clone();
+        longer.push(0);
+        assert!(check_binding(Some(&NONCE), Some(&longer), &req).is_err());
+        let shorter = &good[..good.len() - 1];
+        assert!(check_binding(Some(&NONCE), Some(shorter), &req).is_err());
+        let mut wrong_prefix = good.clone();
+        wrong_prefix[0] ^= 1;
+        assert!(check_binding(Some(&NONCE), Some(&wrong_prefix), &req).is_err());
+    }
+}
