@@ -1,0 +1,21 @@
+[package]
+name = "pt-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Parent-instance byte proxy: TCP listener piped to the enclave over vsock (or TCP for the local mock). Never parses frames."
+
+[[bin]]
+name = "pt-host"
+path = "src/main.rs"
+
+[dependencies]
+pt-tee.workspace = true
+tokio.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
