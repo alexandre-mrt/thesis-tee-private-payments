@@ -5,6 +5,7 @@ pub mod bank;
 pub mod error;
 pub mod files;
 pub mod flows;
+pub mod payment;
 pub mod retry;
 pub mod wallet;
 
@@ -15,6 +16,10 @@ pub use files::{
     OfferFile, ReceiptFile, RequestFile, file_error, read_json, write_atomic, write_json,
 };
 pub use flows::{Refreshed, enroll, finish, refresh};
+pub use payment::{
+    PreparedPay, PreparedReceive, Settlement, commit_pay, commit_receive, pay, prepare_pay,
+    prepare_receive, receive, request, submit_receive,
+};
 pub use wallet::{Pending, Wallet, WalletData};
 
 pub const DEFAULT_BANK: &str = "127.0.0.1:7700";
