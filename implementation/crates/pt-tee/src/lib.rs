@@ -18,6 +18,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod attestation;
 pub mod channel;
 pub mod framing;
 pub mod transport;
