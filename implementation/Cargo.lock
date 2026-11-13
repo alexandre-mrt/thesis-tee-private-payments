@@ -1899,6 +1899,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tv-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hex",
+ "pt-tee",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tv-bank",
+ "tv-client",
+ "tv-core",
+ "tv-enclave",
+]
+
+[[package]]
 name = "tv-client"
 version = "0.1.0"
 dependencies = [

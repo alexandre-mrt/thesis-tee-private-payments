@@ -8,6 +8,7 @@ members = [
   "crates/tv-bank",
   "crates/tv-client",
   "crates/tv-tests",
+  "crates/tv-bench",
 ]
 
 [workspace.package]
