@@ -1,5 +1,7 @@
 mod attest;
 mod handlers;
+#[cfg(test)]
+mod tests;
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
