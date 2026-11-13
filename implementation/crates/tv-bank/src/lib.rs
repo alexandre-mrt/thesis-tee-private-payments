@@ -14,6 +14,7 @@ pub mod ledger;
 pub mod link;
 pub mod quota;
 pub mod registry;
+pub mod server;
 pub mod store;
 
 pub use bank::{BANK_SOURCE, Bank, Outcome, Policy};
@@ -31,6 +32,10 @@ pub use ledger::{
 pub use link::{EnclaveLink, TcpLink};
 pub use quota::{AttestQuota, MAX_PENDING_KEYS_PER_SOURCE};
 pub use registry::{EnclaveTrust, attest_enclave, parse_enclave};
+pub use server::{
+    AfterAppendHook, CRASH_AFTER_APPEND_ENV, CRASH_EXIT_CODE, ServerConfig, bind,
+    crash_after_append, exit_after_append_hook, serve, source_of,
+};
 pub use store::{Durability, LOG_FILE, LogWriter, Store, Ticket, create_log};
 
 pub const DEFAULT_LISTEN: &str = tv_client::DEFAULT_BANK;
