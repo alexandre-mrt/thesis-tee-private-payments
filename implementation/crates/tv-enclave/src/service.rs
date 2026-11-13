@@ -240,3 +240,6 @@ impl Enclave {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
