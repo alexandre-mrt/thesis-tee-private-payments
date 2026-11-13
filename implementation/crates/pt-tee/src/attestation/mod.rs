@@ -6,11 +6,13 @@
 //! obtains the attested public key.
 
 pub mod doc;
+pub mod mock;
 
 #[cfg(target_os = "linux")]
 pub mod nsm;
 
 pub use doc::{AttestationDoc, Digest};
+pub use mock::MockProvider;
 #[cfg(target_os = "linux")]
 pub use nsm::NsmProvider;
 
