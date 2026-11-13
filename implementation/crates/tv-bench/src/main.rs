@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod party;
 mod profile;
+mod setup;
 mod stats;
 mod store;
 
