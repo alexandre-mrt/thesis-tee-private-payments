@@ -51,3 +51,43 @@ pub fn manifest_digest(manifest: &Manifest) -> Bytes32 {
     h.update(manifest.bank.issuance_pk);
     h.finalize().into()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::BankKeys;
+
+    #[test]
+    fn commitments_bind_every_field() {
+        let c = commitment(5, &[1u8; 32], &[2u8; 32]);
+        assert_ne!(c, commitment(6, &[1u8; 32], &[2u8; 32]));
+        assert_ne!(c, commitment(5, &[3u8; 32], &[2u8; 32]));
+        assert_ne!(c, commitment(5, &[1u8; 32], &[4u8; 32]));
+        assert_eq!(c, commitment(5, &[1u8; 32], &[2u8; 32]));
+    }
+
+    #[test]
+    fn digests_are_domain_separated_and_amount_free() {
+        let a = [1u8; 32];
+        let b = [2u8; 32];
+        let pay = pay_digest(&a, &b, &a, &b);
+        assert_ne!(pay, pay_digest(&b, &a, &a, &b));
+        assert_ne!(pay, pay_digest(&a, &b, &b, &a));
+        assert_ne!(refresh_digest(&a, &b), enroll_digest(&a, &b));
+        let m = Manifest {
+            result_pk: a,
+            bank: BankKeys {
+                state_pk: b,
+                issuance_pk: a,
+            },
+        };
+        let swapped = Manifest {
+            result_pk: a,
+            bank: BankKeys {
+                state_pk: a,
+                issuance_pk: b,
+            },
+        };
+        assert_ne!(manifest_digest(&m), manifest_digest(&swapped));
+    }
+}

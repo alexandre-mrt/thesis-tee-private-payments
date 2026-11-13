@@ -77,3 +77,30 @@ impl std::fmt::Debug for Opening {
         f.write_str("Opening(..)")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_output_hides_secrets() {
+        let state = State {
+            balance: 42,
+            pk: [1u8; 32],
+            r: [2u8; 32],
+        };
+        let text = format!("{state:?}");
+        assert!(!text.contains("42"));
+        assert!(!text.contains(&hex::encode([2u8; 32])));
+        let opening = Opening {
+            balance: 42,
+            r: [2u8; 32],
+            sig: Signature([0u8; 64]),
+            side: SideKind::User,
+            next_pk: [3u8; 32],
+            next_r: [4u8; 32],
+        };
+        assert_eq!(format!("{opening:?}"), "Opening(..)");
+        assert_ne!(random_bytes32(), random_bytes32());
+    }
+}

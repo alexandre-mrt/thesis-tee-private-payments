@@ -147,3 +147,58 @@ pub fn sign_digest(key: &SigningKey, digest: &Bytes32) -> Signature {
 pub fn verify_digest(pk: &Bytes32, digest: &Bytes32, sig: &Signature) -> Result<(), CoreError> {
     verify(pk, digest, sig)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_signatures_are_domain_separated_and_key_bound() {
+        let key = SigningKey::generate();
+        let pk = key.public_key();
+        let com = [9u8; 32];
+        let sig = sign_state(&key, &com);
+        assert!(verify_state(&pk, &com, &sig).is_ok());
+        assert_eq!(
+            verify_state(&pk, &[8u8; 32], &sig),
+            Err(CoreError::BadSignature)
+        );
+        let other = SigningKey::generate().public_key();
+        assert_eq!(
+            verify_state(&other, &com, &sig),
+            Err(CoreError::BadSignature)
+        );
+        let raw = sign_digest(&key, &com);
+        assert_eq!(verify_state(&pk, &com, &raw), Err(CoreError::BadSignature));
+        assert!(verify_digest(&pk, &com, &raw).is_ok());
+        let invalid = (0u8..=255)
+            .map(|b| [b; 32])
+            .find(|bytes| DalekVerifyingKey::from_bytes(bytes).is_err())
+            .unwrap();
+        assert!(matches!(
+            verify_state(&invalid, &com, &sig),
+            Err(CoreError::InvalidKeyMaterial { .. })
+        ));
+    }
+
+    #[test]
+    fn signing_is_deterministic_and_keys_roundtrip() {
+        let key = SigningKey::generate();
+        let again = SigningKey::from_bytes(&key.to_bytes());
+        assert_eq!(key.public_key(), again.public_key());
+        assert_eq!(
+            sign_digest(&key, &[1u8; 32]),
+            sign_digest(&again, &[1u8; 32])
+        );
+    }
+
+    #[test]
+    fn signature_serializes_as_a_byte_string() {
+        let sig = Signature([7u8; SIG_LEN]);
+        let bytes = crate::cbor::encode_cbor(&sig).unwrap();
+        assert_eq!(bytes.len(), 2 + SIG_LEN);
+        assert_eq!(bytes[0], 0x58);
+        let back: Signature = crate::cbor::decode_cbor(&bytes).unwrap();
+        assert_eq!(back, sig);
+    }
+}

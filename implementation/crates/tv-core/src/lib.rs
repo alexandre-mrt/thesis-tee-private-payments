@@ -2,11 +2,13 @@
 
 use std::time::Duration;
 
+pub mod cbor;
 pub mod commit;
 pub mod error;
 pub mod sig;
 pub mod types;
 
+pub use cbor::{decode_cbor, encode_cbor};
 pub use commit::{commitment, enroll_digest, manifest_digest, pay_digest, refresh_digest};
 pub use error::CoreError;
 pub use sig::{
