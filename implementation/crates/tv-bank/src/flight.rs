@@ -177,3 +177,6 @@ pub fn replay(bytes: &[u8]) -> Result<(Index, usize), BankError> {
     tail.check_torn(bytes, index.len())?;
     Ok((index, tail.start))
 }
+
+#[cfg(test)]
+mod tests;
