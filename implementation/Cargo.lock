@@ -1896,6 +1896,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tv-enclave"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hex",
+ "pt-tee",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tv-core",
+ "zeroizing-alloc",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2203,6 +2220,12 @@ name = "zeroize"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"
+
+[[package]]
+name = "zeroizing-alloc"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b5564c80013ee0edbfc4e4d7d66d1a5a44b8adaffbf0103069f51ce0efc5031"
 
 [[package]]
 name = "zmij"
