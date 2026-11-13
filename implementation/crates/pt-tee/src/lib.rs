@@ -20,6 +20,7 @@
 
 pub mod channel;
 pub mod framing;
+pub mod transport;
 
 /// Protocol tag. Prefix of the attestation `user_data` and of the HKDF infos.
 pub const PROTOCOL_TAG: &[u8] = b"platypus-tee/v1";
