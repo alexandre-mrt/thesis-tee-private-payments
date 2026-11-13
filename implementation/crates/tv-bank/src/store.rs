@@ -220,3 +220,141 @@ impl<W: LogWriter> Store<W> {
             .read_all()?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tv_core::{OpKind, Signature};
+
+    use super::*;
+    use crate::journal::testing::{Fault, entry, faulty, set_fault, temp_dir};
+
+    #[test]
+    fn append_replay_torn_tail_and_lock() {
+        let dir = temp_dir("replay");
+        create_log(&dir).unwrap();
+        assert!(matches!(create_log(&dir), Err(BankError::File { .. })));
+        let mut store = Store::open(&dir).unwrap();
+        assert!(store.index().is_empty());
+        store.append(entry(0, OpKind::Enroll, 1)).unwrap();
+        store.append(entry(1, OpKind::Refresh, 1)).unwrap();
+        store.append(entry(2, OpKind::Pay, 2)).unwrap();
+        assert!(matches!(Store::open(&dir), Err(BankError::Locked { .. })));
+        drop(store);
+        let path = dir.join(LOG_FILE);
+        let good = std::fs::read(&path).unwrap();
+        let mut torn = good.clone();
+        torn.truncate(good.len() - 7);
+        std::fs::write(&path, &torn).unwrap();
+        let store = Store::open(&dir).unwrap();
+        assert_eq!(store.index().len(), 2);
+        assert_eq!(store.lookup(&[1u8; 32]).unwrap().kind, OpKind::Refresh);
+        assert!(store.index().is_spent(&[1u8; 32]));
+        assert!(!store.index().is_fresh_serial(&[1u8; 32]));
+        assert!(store.index().is_fresh_serial(&[2u8; 32]));
+        assert!(!store.index().is_fresh_commitment(&[101u8; 32]));
+        let (ticket, answer) = store.answer(&[51u8; 32]).unwrap();
+        assert_eq!(
+            answer,
+            BankResponse::Refreshed {
+                sig: Signature([1u8; 64])
+            }
+        );
+        assert_eq!(store.durability(ticket).unwrap(), Durability::Durable);
+        assert_eq!(store.range(1, 10).len(), 1);
+        drop(store);
+        let mut corrupt = good.clone();
+        corrupt[5] = b'#';
+        std::fs::write(&path, &corrupt).unwrap();
+        assert!(matches!(
+            Store::open(&dir),
+            Err(BankError::Corrupt { line: 0, .. })
+        ));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn staged_entries_are_invisible_until_flushed_and_a_rollback_reverts_them() {
+        let dir = temp_dir("staged");
+        let mut store = faulty(&dir, Fault::None);
+        store.append(entry(0, OpKind::Enroll, 1)).unwrap();
+        let ticket = store.stage(entry(1, OpKind::Refresh, 1)).unwrap();
+        assert_eq!(store.durability(ticket).unwrap(), Durability::Staged);
+        assert_eq!(store.entries().len(), 1);
+        assert_eq!(store.lookup(&[1u8; 32]).unwrap().kind, OpKind::Enroll);
+        assert_eq!(store.range(0, 10).len(), 1);
+        assert!(store.index().is_spent(&[1u8; 32]));
+        let (found, _) = store.answer(&[51u8; 32]).unwrap();
+        assert_eq!(found, ticket);
+        set_fault(&store, Fault::WriteThenFail);
+        assert!(matches!(store.flush_blocking(), Err(BankError::Io(_))));
+        assert_eq!(store.durability(ticket).unwrap(), Durability::RolledBack);
+        assert!(!store.index().is_spent(&[1u8; 32]));
+        assert_eq!(store.index().len(), 1);
+        assert!(store.answer(&[51u8; 32]).is_none());
+        set_fault(&store, Fault::None);
+        let again = store.stage(entry(1, OpKind::Refresh, 1)).unwrap();
+        assert_ne!(again, ticket);
+        store.flush_blocking().unwrap();
+        assert_eq!(store.durability(again).unwrap(), Durability::Durable);
+        assert_eq!(store.durability(ticket).unwrap(), Durability::RolledBack);
+        assert_eq!(store.lookup(&[1u8; 32]).unwrap().kind, OpKind::Refresh);
+        drop(store);
+        let reopened = Store::open(&dir).unwrap();
+        assert_eq!(reopened.entries().len(), 2);
+        drop(reopened);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_append_is_rolled_back_so_the_serial_stays_unspent_on_disk_and_in_memory() {
+        let dir = temp_dir("rollback");
+        let mut store = faulty(&dir, Fault::None);
+        store.append(entry(0, OpKind::Enroll, 1)).unwrap();
+        drop(store);
+        let len_before = std::fs::metadata(dir.join(LOG_FILE)).unwrap().len();
+        let mut store = faulty(&dir, Fault::WriteThenFail);
+        assert!(matches!(
+            store.append(entry(1, OpKind::Refresh, 1)),
+            Err(BankError::Io(_))
+        ));
+        assert!(!store.index().is_spent(&[1u8; 32]));
+        assert_eq!(store.index().len(), 1);
+        assert_eq!(
+            std::fs::metadata(dir.join(LOG_FILE)).unwrap().len(),
+            len_before
+        );
+        set_fault(&store, Fault::None);
+        store.append(entry(1, OpKind::Refresh, 1)).unwrap();
+        assert!(store.index().is_spent(&[1u8; 32]));
+        drop(store);
+        let reopened = Store::open(&dir).unwrap();
+        assert_eq!(reopened.index().len(), 2);
+        assert!(reopened.index().is_spent(&[1u8; 32]));
+        drop(reopened);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_roll_back_poisons_the_store_until_restart() {
+        let dir = temp_dir("poison");
+        let mut store = faulty(&dir, Fault::WriteThenFailAndNoTruncate);
+        assert!(matches!(
+            store.append(entry(0, OpKind::Refresh, 1)),
+            Err(BankError::StorePoisoned)
+        ));
+        assert!(matches!(store.healthy(), Err(BankError::StorePoisoned)));
+        assert!(!store.index().is_spent(&[1u8; 32]));
+        set_fault(&store, Fault::None);
+        assert!(matches!(
+            store.append(entry(0, OpKind::Refresh, 1)),
+            Err(BankError::StorePoisoned)
+        ));
+        drop(store);
+        let restarted = Store::open(&dir).unwrap();
+        assert!(restarted.healthy().is_ok());
+        assert_eq!(restarted.index().len(), 1);
+        assert!(restarted.index().is_spent(&[1u8; 32]));
+        drop(restarted);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
