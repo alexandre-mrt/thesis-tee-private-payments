@@ -352,3 +352,315 @@ impl Activity {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::SocketAddr;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio::sync::watch;
+    use tokio::task::JoinHandle;
+    use tokio::time::{Duration, sleep, timeout};
+
+    const TEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+    /// Echo server on an ephemeral loopback port.
+    async fn spawn_echo() -> SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                tokio::spawn(async move {
+                    let (mut r, mut w) = stream.split();
+                    let _ = tokio::io::copy(&mut r, &mut w).await;
+                });
+            }
+        });
+        addr
+    }
+
+    struct Harness {
+        proxy_addr: SocketAddr,
+        shutdown: watch::Sender<bool>,
+        task: JoinHandle<Result<(), ProxyError>>,
+    }
+
+    async fn spawn_proxy(config: ProxyConfig) -> Harness {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_addr = listener.local_addr().unwrap();
+        let (shutdown, rx) = watch::channel(false);
+        let task = tokio::spawn(run(listener, config, rx));
+        Harness {
+            proxy_addr,
+            shutdown,
+            task,
+        }
+    }
+
+    fn tcp_config(target: SocketAddr) -> ProxyConfig {
+        ProxyConfig {
+            target: Endpoint::Tcp(target.to_string()),
+            max_connections: 8,
+            max_connections_per_ip: 8,
+            idle_timeout: Duration::from_secs(30),
+            connect_timeout: Duration::from_secs(2),
+            shutdown_grace: Duration::from_secs(2),
+        }
+    }
+
+    #[test]
+    fn config_validation() {
+        let base = tcp_config("127.0.0.1:1".parse().unwrap());
+        assert!(base.clone().validate().is_ok());
+        for (name, cfg) in [
+            (
+                "max_connections",
+                ProxyConfig {
+                    max_connections: 0,
+                    ..base.clone()
+                },
+            ),
+            (
+                "max_connections",
+                ProxyConfig {
+                    max_connections: Semaphore::MAX_PERMITS + 1,
+                    ..base.clone()
+                },
+            ),
+            (
+                "max_connections_per_ip",
+                ProxyConfig {
+                    max_connections_per_ip: 0,
+                    ..base.clone()
+                },
+            ),
+            (
+                "timeouts",
+                ProxyConfig {
+                    idle_timeout: Duration::ZERO,
+                    ..base.clone()
+                },
+            ),
+        ] {
+            assert!(
+                matches!(cfg.validate(), Err(ProxyError::InvalidConfig { name: n, .. }) if n == name),
+                "{name}"
+            );
+        }
+    }
+
+    /// Adversarial review A9: one source address cannot take every slot.
+    #[tokio::test]
+    async fn per_address_limit_rejects_excess_and_recovers() {
+        let echo = spawn_echo().await;
+        let config = ProxyConfig {
+            max_connections: 8,
+            max_connections_per_ip: 1,
+            ..tcp_config(echo)
+        };
+        let h = spawn_proxy(config).await;
+
+        let mut first = TcpStream::connect(h.proxy_addr).await.unwrap();
+        echo_round_trip(&mut first, b"one").await;
+        // Same source address (loopback): over the per-address limit although
+        // seven global slots are free.
+        let mut second = TcpStream::connect(h.proxy_addr).await.unwrap();
+        let _ = second.write_all(b"two").await;
+        assert!(
+            peer_closed(&mut second).await,
+            "excess per-address connection must be closed"
+        );
+        echo_round_trip(&mut first, b"still here").await;
+        drop(first);
+
+        let deadline = tokio::time::Instant::now() + TEST_TIMEOUT;
+        loop {
+            let mut third = TcpStream::connect(h.proxy_addr).await.unwrap();
+            third.write_all(b"three").await.unwrap();
+            let mut back = [0u8; 5];
+            match timeout(Duration::from_millis(500), third.read_exact(&mut back)).await {
+                Ok(Ok(_)) => {
+                    assert_eq!(&back, b"three");
+                    break;
+                }
+                _ if tokio::time::Instant::now() < deadline => {
+                    sleep(Duration::from_millis(20)).await
+                }
+                other => panic!("per-address slot never released: {other:?}"),
+            }
+        }
+
+        h.shutdown.send(true).unwrap();
+        timeout(TEST_TIMEOUT, h.task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    async fn echo_round_trip(stream: &mut TcpStream, payload: &[u8]) {
+        stream.write_all(payload).await.unwrap();
+        let mut back = vec![0u8; payload.len()];
+        timeout(TEST_TIMEOUT, stream.read_exact(&mut back))
+            .await
+            .expect("echo timed out")
+            .unwrap();
+        assert_eq!(back, payload);
+    }
+
+    /// Reads until EOF or error; returns true if the peer closed cleanly or reset.
+    async fn peer_closed(stream: &mut TcpStream) -> bool {
+        let mut buf = [0u8; 16];
+        match timeout(TEST_TIMEOUT, stream.read(&mut buf)).await {
+            Ok(Ok(0)) | Ok(Err(_)) => true,
+            Ok(Ok(_)) => false,
+            Err(_) => panic!("peer did not close in time"),
+        }
+    }
+
+    #[tokio::test]
+    async fn echo_round_trip_over_tcp_target() {
+        let echo = spawn_echo().await;
+        let h = spawn_proxy(tcp_config(echo)).await;
+
+        let mut client = TcpStream::connect(h.proxy_addr).await.unwrap();
+        echo_round_trip(&mut client, b"hello enclave").await;
+        // Larger than one read buffer, exercises chunked relaying both ways.
+        let big: Vec<u8> = (0..(3 * BUF_SIZE + 17)).map(|i| (i % 251) as u8).collect();
+        echo_round_trip(&mut client, &big).await;
+        echo_round_trip(&mut client, b"again").await;
+
+        // Client half-close propagates to the upstream, which then closes back.
+        client.shutdown().await.unwrap();
+        assert!(peer_closed(&mut client).await);
+
+        h.shutdown.send(true).unwrap();
+        timeout(TEST_TIMEOUT, h.task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn connection_limit_rejects_excess_and_recovers() {
+        let echo = spawn_echo().await;
+        let config = ProxyConfig {
+            max_connections: 1,
+            ..tcp_config(echo)
+        };
+        let h = spawn_proxy(config).await;
+
+        let mut first = TcpStream::connect(h.proxy_addr).await.unwrap();
+        echo_round_trip(&mut first, b"one").await;
+
+        // Second connection is over the limit: accepted by the kernel, then closed by the proxy.
+        let mut second = TcpStream::connect(h.proxy_addr).await.unwrap();
+        let _ = second.write_all(b"two").await;
+        assert!(
+            peer_closed(&mut second).await,
+            "excess connection must be closed"
+        );
+
+        // The first connection is unaffected.
+        echo_round_trip(&mut first, b"still here").await;
+        drop(first);
+
+        // Once the slot is released a new connection is served again. Release is
+        // asynchronous (the relay task must observe the close), so poll briefly.
+        let deadline = tokio::time::Instant::now() + TEST_TIMEOUT;
+        loop {
+            let mut third = TcpStream::connect(h.proxy_addr).await.unwrap();
+            third.write_all(b"three").await.unwrap();
+            let mut back = [0u8; 5];
+            match timeout(Duration::from_millis(500), third.read_exact(&mut back)).await {
+                Ok(Ok(_)) => {
+                    assert_eq!(&back, b"three");
+                    break;
+                }
+                _ if tokio::time::Instant::now() < deadline => {
+                    sleep(Duration::from_millis(20)).await
+                }
+                other => panic!("slot never released: {other:?}"),
+            }
+        }
+
+        h.shutdown.send(true).unwrap();
+        timeout(TEST_TIMEOUT, h.task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn idle_connection_is_closed() {
+        let echo = spawn_echo().await;
+        let config = ProxyConfig {
+            idle_timeout: Duration::from_millis(150),
+            ..tcp_config(echo)
+        };
+        let h = spawn_proxy(config).await;
+
+        let mut client = TcpStream::connect(h.proxy_addr).await.unwrap();
+        echo_round_trip(&mut client, b"ping").await;
+        let started = tokio::time::Instant::now();
+        assert!(
+            peer_closed(&mut client).await,
+            "idle connection must be closed"
+        );
+        assert!(started.elapsed() >= Duration::from_millis(100));
+
+        h.shutdown.send(true).unwrap();
+        timeout(TEST_TIMEOUT, h.task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn unreachable_upstream_closes_client() {
+        let unused = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let dead = unused.local_addr().unwrap();
+        drop(unused);
+        let h = spawn_proxy(tcp_config(dead)).await;
+
+        let mut client = TcpStream::connect(h.proxy_addr).await.unwrap();
+        assert!(peer_closed(&mut client).await);
+
+        h.shutdown.send(true).unwrap();
+        timeout(TEST_TIMEOUT, h.task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn shutdown_stops_accepting_and_drains_within_grace() {
+        let echo = spawn_echo().await;
+        let config = ProxyConfig {
+            shutdown_grace: Duration::from_millis(200),
+            ..tcp_config(echo)
+        };
+        let h = spawn_proxy(config).await;
+
+        let mut active = TcpStream::connect(h.proxy_addr).await.unwrap();
+        echo_round_trip(&mut active, b"busy").await;
+
+        h.shutdown.send(true).unwrap();
+        // The run loop must return even though a connection is still open.
+        timeout(TEST_TIMEOUT, h.task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        // The lingering connection was aborted after the grace period.
+        assert!(peer_closed(&mut active).await);
+        // The listener is gone.
+        assert!(TcpStream::connect(h.proxy_addr).await.is_err());
+    }
+}
