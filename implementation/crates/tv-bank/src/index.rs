@@ -135,3 +135,57 @@ pub fn answer_for(entry: &LogEntry) -> Option<BankResponse> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tv_core::Signature;
+
+    use super::*;
+
+    fn entry(seq: u64, kind: OpKind, serial: u8) -> LogEntry {
+        LogEntry {
+            seq,
+            kind,
+            serials: vec![[serial; 32]],
+            commitments: vec![[serial + 100; 32]],
+            sigs: vec![Signature([seq as u8; 64])],
+            digest: [seq as u8 + 50; 32],
+        }
+    }
+
+    #[test]
+    fn sequence_gaps_are_corrupt() {
+        let mut index = Index::default();
+        index.apply(entry(0, OpKind::Enroll, 1)).unwrap();
+        assert!(matches!(
+            index.apply(entry(2, OpKind::Enroll, 2)),
+            Err(BankError::Corrupt { .. })
+        ));
+    }
+
+    #[test]
+    fn bounded_lookups_fall_back_to_the_enroll_entry_and_truncate_rebuilds() {
+        let mut index = Index::default();
+        index.apply(entry(0, OpKind::Enroll, 1)).unwrap();
+        index.apply(entry(1, OpKind::Refresh, 1)).unwrap();
+        index.apply(entry(2, OpKind::Refresh, 2)).unwrap();
+        assert_eq!(index.lookup(&[1u8; 32]).unwrap().kind, OpKind::Refresh);
+        assert_eq!(
+            index.lookup_within(&[1u8; 32], 1).unwrap().kind,
+            OpKind::Enroll
+        );
+        assert!(index.lookup_within(&[1u8; 32], 0).is_none());
+        assert!(index.lookup_within(&[2u8; 32], 2).is_none());
+        assert_eq!(index.range_within(0, 10, 1).len(), 1);
+        assert_eq!(index.answer(&[51u8; 32]).unwrap().0, 1);
+        index.truncate(1).unwrap();
+        assert_eq!(index.len(), 1);
+        assert!(!index.is_spent(&[1u8; 32]));
+        assert!(!index.is_fresh_serial(&[1u8; 32]));
+        assert!(index.is_fresh_serial(&[2u8; 32]));
+        assert!(index.is_fresh_commitment(&[102u8; 32]));
+        assert!(index.answer(&[51u8; 32]).is_none());
+        assert!(index.lookup(&[2u8; 32]).is_none());
+        assert_eq!(index.lookup(&[1u8; 32]).unwrap().kind, OpKind::Enroll);
+    }
+}
