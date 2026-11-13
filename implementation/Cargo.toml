@@ -5,6 +5,7 @@ members = [
   "crates/pt-host",
   "crates/tv-core",
   "crates/tv-enclave",
+  "crates/tv-bank",
   "crates/tv-client",
 ]
 
@@ -19,6 +20,7 @@ publish = false
 pt-tee = { path = "crates/pt-tee" }
 tv-core = { path = "crates/tv-core" }
 tv-enclave = { path = "crates/tv-enclave" }
+tv-bank = { path = "crates/tv-bank" }
 tv-client = { path = "crates/tv-client" }
 aws-nitro-enclaves-nsm-api = "0.5"
 aws-nitro-enclaves-cose = "0.6"

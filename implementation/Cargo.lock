@@ -1880,6 +1880,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "tv-bank"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hex",
+ "pt-tee",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tv-client",
+ "tv-core",
+]
+
+[[package]]
 name = "tv-client"
 version = "0.1.0"
 dependencies = [
