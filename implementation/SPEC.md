@@ -7,7 +7,7 @@ Prototype of round 1 as revised at the advisor meeting of 2026-11-10: **the encl
 | Party | Integrity | Privacy |
 |---|---|---|
 | Bank (process `tv-bank`) | trusted | honest-but-curious: must never see amounts, balances, or links between a spent serial and the state it spends |
-| Enclave (`tv-enclave`, behind the bank, reached only by the bank's process) | runs the attested code correctly; its memory may be read (then only privacy is lost) | protects what it processes |
+| Enclave (`tv-enclave`, inside the bank, reached only by the bank's process) | runs the attested code correctly; its memory may be read (then only privacy is lost) | protects what it processes |
 | Users (`tv-cli`) | untrusted | the protected party |
 
 Properties the tests must demonstrate, named after Platypus (Wüst et al., CCS 2022, Section 5):
@@ -19,7 +19,7 @@ Properties the tests must demonstrate, named after Platypus (Wüst et al., CCS 2
 
 ## 1. Workspace
 
-Rust 2024, same toolchain and workspace dependencies as `~/projects/thesis/tee-pay/Cargo.toml` (copy that `[workspace.dependencies]` block, drop what is unused, add `proptest` for tests if wanted). Crates:
+Rust 2024, same toolchain and workspace dependencies as the earlier tee-pay prototype (its `[workspace.dependencies]` block without what is unused, plus `proptest` for tests). Crates:
 - `crates/pt-tee`, `crates/pt-host`: vendored unchanged from tee-pay (commit 8e867e1), originally platypus-tee 05cb9c4. Attestation (NSM, mock, verifier), X25519/HKDF/ChaCha20-Poly1305 channel, CBOR framing, TCP/vsock transport. **Do not modify.**
 - `crates/tv-core`: primitives, types, wire messages.
 - `crates/tv-enclave`: lib + bin `tv-enclave` (`--mock` TCP loopback, else vsock).
@@ -97,7 +97,7 @@ Wallet JSON: seed, current index `i`, current signed state `(b, C, σ)`, pending
 - `scripts/demo.sh` (`make demo`): init bank, mock enclave, register, two wallets, issue to Alice, Alice pays Bob, finish, refresh, redeem, recover; prints balances.
 - `scripts/crash-demo.sh` (`make crash-demo`): kill the enclave before the answer, kill the bank after the append, show retry gives the stored answer and balances are unchanged.
 - `make test`: build, test, clippy `-D warnings`, fmt check.
-- `deploy/tv-enclave.Dockerfile`: builds the enclave image for `nitro-cli build-enclave` (adapt `~/projects/thesis/tee-pay/deploy/tp-enclave.Dockerfile`). Not deployed in this pass.
+- `deploy/tv-enclave.Dockerfile`: builds the enclave image for `nitro-cli build-enclave` (adapted from tee-pay's `deploy/tp-enclave.Dockerfile`). Not deployed in this pass.
 
 ## 7. Tests (definition of done)
 
