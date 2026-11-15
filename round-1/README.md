@@ -1,6 +1,6 @@
 # Round 1: Platypus with a TEE in place of the zero-knowledge proofs
 
-**Status:** submitted for advisor validation (2026-11-09), revised after the advisor meeting of 2026-11-10: the enclave runs inside the bank. Builds on [SCOPE.md](../SCOPE.md) and [FOUNDATIONS.md](../FOUNDATIONS.md).
+**Status:** submitted for advisor validation (2026-11-09), revised after the advisor meeting of 2026-11-10: the enclave runs inside the bank. Builds on the [scope](../README.md#scope) and the [foundation](../README.md#foundation-the-tee-protects-privacy-never-integrity).
 
 | Design | Behaviour | Analysis |
 |---|---|---|
@@ -164,7 +164,7 @@ The enclave keeps no payment state between requests, so a crash loses nothing:
 
 ## 9. If the enclave's memory is read
 
-Suppose an attacker can read everything the enclave holds or receives: the openings of the states, the channel keys of the requests in progress, and the enclave's signing key. The code itself still runs correctly. [FOUNDATIONS](../FOUNDATIONS.md#who-reads-the-memory) separates a **remote reader**, who only reads, from a **host-level reader**, who can also impersonate the enclave on the bank's machine.
+Suppose an attacker can read everything the enclave holds or receives: the openings of the states, the channel keys of the requests in progress, and the enclave's signing key. The code itself still runs correctly. [The foundation](../README.md#who-reads-the-memory) separates a **remote reader**, who only reads, from a **host-level reader**, who can also impersonate the enclave on the bank's machine.
 
 | Property | Holds? | Why |
 |---|---|---|

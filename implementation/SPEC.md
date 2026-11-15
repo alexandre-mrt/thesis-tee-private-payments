@@ -1,6 +1,6 @@
 # tee-pay-v2: specification
 
-Prototype of round 1 as revised at the advisor meeting of 2026-11-10: **the enclave runs inside the bank** (same machine, private channel), one-time key serials, owner signatures checked by the bank. Design reference: github.com/alexandre-mrt/thesis-tee-private-payments (round-1/README.md, FOUNDATIONS.md). This file is the ground truth for the code.
+Prototype of round 1 as revised at the advisor meeting of 2026-11-10: **the enclave runs inside the bank** (same machine, private channel), one-time key serials, owner signatures checked by the bank. Design reference: github.com/alexandre-mrt/thesis-tee-private-payments (round-1/README.md, README.md). This file is the ground truth for the code.
 
 ## 0. Trust model and properties
 
