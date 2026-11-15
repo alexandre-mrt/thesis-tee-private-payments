@@ -1,6 +1,6 @@
 # Foundation: the TEE protects privacy, never integrity
 
-**Status:** the rule is validated (kickoff, 2026-10-19). Its consequences below are submitted for validation (2026-11-09); the attacker classes and the two refinements are submitted for validation (2026-11-10).
+**Status:** the rule is validated (kickoff, 2026-10-19). Its consequences below are submitted for validation (2026-11-09); the attacker classes and two consequences added on 2026-11-10 (prevent or detect; checks against the bank's own secrets) are submitted for validation.
 
 > "TEE not for integrity but for privacy." (all advisors, kickoff 2026-10-19)
 >
