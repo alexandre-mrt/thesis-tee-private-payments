@@ -9,8 +9,8 @@ Can a trusted execution environment (TEE) run by a central bank replace the zero
 - **The idea.** Platypus's two zero-knowledge proofs are replaced by one check in a TEE (the enclave) that runs inside the bank. The enclave opens the hidden states and checks the balances, so the bank never sees amounts, balances, or who pays whom.
 - **The rule.** If the TEE breaks, only privacy may be lost: no money is created, stolen, spent twice or destroyed. No secret that can spend funds is ever sent to the TEE.
 - **How round 1 meets it.** Serials are one-time public keys derived from each user's seed. Owners sign every payment, and the bank checks those signatures and its spent set itself, so ownership, no double spend and no fund destruction hold even if the enclave's memory is read.
-- **The open gap.** Balance integrity still rests on the enclave's checks, accepted only from the bank's own enclave over its own channel. It holds against a remote reader of enclave memory, not against a host-level one; closing it needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
-- **Status.** Scope and rule validated; round 1 and its Rust prototype (mock enclave, AWS Nitro deployment pending) submitted for validation.
+- **The key assumption.** Balance integrity rests on the enclave's checks, accepted only from the bank's own enclave. The bank runs the TEE and is trusted for integrity, so the enclave's signing key is assumed not to leak, and balance integrity holds. Without that assumption it holds against a remote reader of enclave memory, not against a host-level one; dropping the assumption needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
+- **Status.** Scope and rule validated; the key assumption, round 1 and its Rust prototype (mock enclave, AWS Nitro deployment pending) submitted for validation.
 
 ## Contents
 | | Content | Status |
@@ -59,7 +59,7 @@ From Alberto at the kickoff:
 
 ## Foundation: the TEE protects privacy, never integrity
 
-**Status:** the rule is validated (kickoff, 2026-10-19). Its consequences below are submitted for validation (2026-11-09); the attacker classes and two consequences added on 2026-11-10 (prevent or detect; checks against the bank's own secrets) are submitted for validation.
+**Status:** the rule is validated (kickoff, 2026-10-19). Its consequences below are submitted for validation (2026-11-09); the attacker classes and two consequences added on 2026-11-10 (prevent or detect; checks against the bank's own secrets) are submitted for validation; so is the key assumption (2026-11-15).
 
 > "TEE not for integrity but for privacy." (all advisors, kickoff 2026-10-19)
 >
@@ -75,11 +75,19 @@ If the TEE breaks, **only privacy may be lost**. No money may be created, stolen
 |---|---|---|
 | **works** | runs the attested code and keeps its memory secret | yes |
 | **crashes** | stops and loses its memory; a fresh instance starts | yes |
-| **is broken** (its memory is read) | runs the attested code correctly, but everything it holds or receives can be read: its inputs and its own keys | yes |
+| **is broken** (its memory is read) | runs the attested code correctly, but everything it receives can be read, including the channel keys of the requests in progress; its signing key stays secret (assumption below) | yes |
+| **leaks its signing key** | as above, and its signing key is read too | beyond the assumption: analysed, not required |
 | **runs malicious code** | its code is replaced | no |
 
+#### Assumption: the enclave's signing key does not leak
+Submitted for validation (2026-11-15).
+
+The bank runs the TEE on its own machine, and only the bank's software talks to it. The bank is trusted for integrity, and that trust covers keeping its TEE intact: a TEE that anyone could run or answer for would not be trusted. The thesis therefore assumes that the enclave's signing key, which signs its results, never leaks, and that whoever can answer the bank in the enclave's place has compromised the bank itself, which is out of scope.
+
+A broken TEE still leaks what the enclave receives: the openings, the amounts and the channel keys of the requests in progress. That costs privacy, never integrity, as the rule requires. The assumption reads the kickoff rule as: the TEE adds no integrity assumption beyond the bank that runs it. The case where the signing key does leak is kept below, as an analysis beyond the assumption.
+
 #### Who reads the memory
-"The TEE is broken" covers attackers with different reach. Which one the thesis targets is open (submitted for validation, 2026-11-10).
+Beyond the assumption: if the enclave's signing key did leak, what is lost depends on the attacker's reach (submitted for validation, 2026-11-10).
 
 | Attacker | Reads the enclave's memory and keys | Can also inject messages on the bank's machine | Examples |
 |---|---|---|---|
@@ -105,7 +113,7 @@ The integrity properties follow Platypus (Section 5): ownership is its transacti
 These consequences are derived, not yet validated.
 - **The TEE alone cannot prove balances to the bank.** To check balances it cannot see, the bank must verify something about hidden values, and doing that without learning anything else is a zero-knowledge proof by definition. A TEE can only vouch with its signature or its attestation, so a design that relies on the TEE for balance moves integrity onto the TEE.
 - **The bank either prevents or detects, nothing in between.** A bank-side check of hidden balances is either a proof the bank verifies before it settles, which prevents invalid payments, or a check after the fact (supply totals, audits), which only detects them once the money has moved. Only the first meets the rule; the second can bound a loss but not exclude it.
-- **What the TEE emits must be checkable against the bank's own secrets.** A check that rests on a secret the TEE holds is lost when the TEE is broken. A check against something the bank chose and the TEE never saw (a fresh challenge, a key the bank keeps) survives. This is how ownership already works in round 1: the bank checks signatures under keys that never entered the TEE.
+- **What the TEE emits must be checkable against the bank's own secrets.** A check that rests on a secret the TEE holds is lost if that secret leaks; the key assumption rules this out for the enclave's signing key. A check against something the bank chose and the TEE never saw (a fresh challenge, a key the bank keeps) survives even beyond the assumption. This is how ownership already works in round 1: the bank checks signatures under keys that never entered the TEE.
 - **Every operation the TEE vouches for counts.** Enrollment and refresh carry the same risk as a payment: wherever the bank signs a new state on the TEE's word alone, a broken TEE can create money there too.
 - **Ownership is cheap to keep on the bank's side.** Owners sign their own transactions with keys that never leave their devices, and the bank verifies those signatures.
 - **The TEE's role is privacy and cost.** It can open states, hide who pays whom, or compute proofs on behalf of weak devices, provided the proof's witness holds no long-term spending key (Platypus's witness holds one). A break then leaks what it saw, and the bank's checks are unaffected.
@@ -117,19 +125,19 @@ Round 1 as revised at the advisor meeting of 2026-11-10 (the enclave runs inside
 - **Ownership integrity:** nobody but the owner can spend, redirect or change a payment of a state. The bank checks it itself, with the owners' signatures under one-time keys that never reach the enclave.
 - **Balance integrity:** no money is printed. No state appears that the bank never issued, no balance is forged, every payment moves exactly its amount, and nothing is spent twice. The double-spend part is the bank's spent set; the rest rests on the enclave's checks, accepted only from the bank's own enclave over its own channel.
 
-| Property | Platypus | Checked by | Remote reader | Host-level reader |
-|---|---|---|---|---|
-| Only the owner spends; amount and payee fixed | unforgeability (5.1) | bank: owner signatures (B2) | holds | holds |
-| No spend of a state the bank never issued (forged balance) | unforgeability (5.1), its "non-existing account" case | enclave (E1), accepted over the bank's channel | holds | **lost** |
-| No money printed: each payment moves exactly its amount | balance invariance (5.2) | enclave (E2, E4), same channel | holds | **lost** |
-| No double spend | balance invariance (5.2) | bank: spent set (B4) | holds | holds |
-| Nobody invalidates another user's state | Claim 5.4 | bank: burning needs the owner's signature | holds | holds |
-| Holding limit respected | Claim 5.5 (holding limit only; no receiving limit yet) | enclave (E4) | holds | **lost** |
-| Privacy toward the bank | indistinguishability (5.3), bank only | enclave | lost for the requests read | lost for the requests read |
+| Property | Platypus | Checked by | Under the key assumption | Key leaked, remote reader | Key leaked, host-level reader |
+|---|---|---|---|---|---|
+| Only the owner spends; amount and payee fixed | unforgeability (5.1) | bank: owner signatures (B2) | holds | holds | holds |
+| No spend of a state the bank never issued (forged balance) | unforgeability (5.1), its "non-existing account" case | enclave (E1), accepted over the bank's channel | holds | holds | **lost** |
+| No money printed: each payment moves exactly its amount | balance invariance (5.2) | enclave (E2, E4), same channel | holds | holds | **lost** |
+| No double spend | balance invariance (5.2) | bank: spent set (B4) | holds | holds | holds |
+| Nobody invalidates another user's state | Claim 5.4 | bank: burning needs the owner's signature | holds | holds | holds |
+| Holding limit respected | Claim 5.5 (holding limit only; no receiving limit yet) | enclave (E4) | holds | holds | **lost** |
+| Privacy toward the bank | indistinguishability (5.3), bank only | enclave | lost for the requests read | lost for the requests read | lost for the requests read |
 
-Ownership integrity never depends on the enclave. Balance integrity survives a remote reader because the bank accepts results only from its own enclave, in answer to its own nonce; it is lost to a host-level reader, which can impersonate the enclave on that channel. Closing that last gap needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
+Ownership integrity never depends on the enclave. Under the key assumption, balance integrity holds too: the bank accepts results only from its own enclave, whose signing key does not leak. Beyond the assumption, balance integrity survives a remote reader because the bank accepts results only from its own enclave, in answer to its own nonce; it is lost to a host-level reader, which can impersonate the enclave on that channel. Holding it without the assumption needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
 
 ### Where the designs stand
 | Design | Ownership integrity | Balance integrity | Status |
 |---|---|---|---|
-| [Round 1](round-1/PROTOCOL.md) | checked by the bank | checked by the enclave inside the bank; holds against a remote reader, not a host-level one | submitted 2026-11-09, revised 2026-11-10 |
+| [Round 1](round-1/PROTOCOL.md) | checked by the bank | checked by the enclave inside the bank; holds under the key assumption; beyond it, holds against a remote reader, not a host-level one | submitted 2026-11-09, revised 2026-11-10 |
