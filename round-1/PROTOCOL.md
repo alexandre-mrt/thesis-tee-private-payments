@@ -1,6 +1,6 @@
 # Round 1: Platypus with a TEE in place of the zero-knowledge proofs
 
-**Status:** submitted for advisor validation (2026-11-09), revised after the advisor meeting of 2026-11-10: the enclave runs inside the bank. Builds on the [scope](../README.md#scope) and the [foundation](../README.md#foundation-the-tee-protects-privacy-never-integrity).
+**Status:** submitted for advisor validation (2026-11-09), revised after the advisor meeting of 2026-11-10: the enclave runs inside the bank. The key assumption (2026-11-15) is submitted for validation. Builds on the [scope](../README.md#scope) and the [foundation](../README.md#foundation-the-tee-protects-privacy-never-integrity).
 
 | Design | Behaviour | Analysis |
 |---|---|---|
@@ -24,7 +24,7 @@ Round 1 keeps Platypus's base transaction (Platypus, Sections 3 and 7) and repla
 
 > **A second adjustment comes from the advisor meeting of 2026-11-10: the enclave runs inside the bank.** Bob sends the payment to the bank's machine. The enclave checks it and hands its result straight to the bank, which settles in the same step and answers Bob. Results never travel outside the bank's machine, so nobody outside it can submit a result.
 
-**Result.** If the enclave's memory is read, the bank still enforces ownership, no double spend and no fund destruction, but the privacy of the requests read is lost. A leaked enclave key creates money only if the attacker can also impersonate the enclave on the bank's machine (section 9). Crashes are handled by retries (section 8). Balance integrity is the open question (section 11).
+**Result.** If the enclave's memory is read, the bank still enforces ownership, no double spend and no fund destruction, but the privacy of the requests read is lost. Balance integrity holds under the [key assumption](../README.md#assumption-the-enclaves-signing-key-does-not-leak): the bank runs the TEE, so the enclave's signing key does not leak. Beyond the assumption, a leaked key creates money only if the attacker can also impersonate the enclave on the bank's machine (section 9), and holding balance without the assumption is the open question (section 11). Crashes are handled by retries (section 8).
 
 ## 2. The system in one paragraph
 
@@ -42,6 +42,7 @@ Each user holds a **state**: a balance, a one-time public key that serves as the
 **Assumptions:**
 - As in Platypus (Section 3.2), the payer obtains the payee's public key over an authenticated channel; round 1 carries the payee's request over the channel built from it. How that key is obtained is out of scope.
 - The hand-off between payer and payee is confidential, for privacy only. An eavesdropper would learn the amount and the two serials, which locate the payment in the public log. It could not change or redirect the payment (section 5).
+- The bank runs the TEE and is trusted to keep it intact, so the enclave's signing key does not leak; answering the bank in the enclave's place counts as compromising the bank ([key assumption](../README.md#assumption-the-enclaves-signing-key-does-not-leak)).
 - For the analysis of section 9, the enclave's memory may also be read while its code keeps running correctly. Replacing its code is out of scope.
 
 ## 4. State and the chain of ownership
@@ -164,7 +165,7 @@ The enclave keeps no payment state between requests, so a crash loses nothing:
 
 ## 9. If the enclave's memory is read
 
-Suppose an attacker can read everything the enclave holds or receives: the openings of the states, the channel keys of the requests in progress, and the enclave's signing key. The code itself still runs correctly. [The foundation](../README.md#who-reads-the-memory) separates a **remote reader**, who only reads, from a **host-level reader**, who can also impersonate the enclave on the bank's machine.
+Under the [key assumption](../README.md#assumption-the-enclaves-signing-key-does-not-leak), a reader gets the openings of the states and the channel keys of the requests in progress, but not the enclave's signing key: only the privacy row below applies, and every integrity row holds. Beyond the assumption, suppose the attacker also reads the enclave's signing key. The code itself still runs correctly. [The foundation](../README.md#who-reads-the-memory) separates a **remote reader**, who only reads, from a **host-level reader**, who can also impersonate the enclave on the bank's machine.
 
 | Property | Holds? | Why |
 |---|---|---|
@@ -172,7 +173,7 @@ Suppose an attacker can read everything the enclave holds or receives: the openi
 | A payment cannot be redirected or changed | **yes** | The owners sign the exact new states (`m`). An exact replay gets the stored answer (B1); anything else spending the serial is refused (B4). |
 | No double spend | **yes** | The bank's spent set (B4). |
 | Nobody can burn another user's state | **yes** | Burning a serial needs its owner's signature. |
-| **Balance:** no money created | **yes** against a remote reader, **no** against a host-level reader | The bank cannot see balances, so E1, E2 and E4 are checked only by the enclave. A remote reader holding the signing key cannot use it: the bank accepts results only from its own enclave, signed over a nonce it just chose, and offers no way to submit one. A host-level reader can answer the bank in the enclave's place: it signs results for states that never existed, with any balance, and redeems them. Enroll and refresh are exposed the same way: a signed enrollment can carry any balance, and a signed refresh can raise one. Neither reader can take anyone's existing state. |
+| **Balance:** no money created | **yes** under the key assumption; beyond it, **yes** against a remote reader, **no** against a host-level reader | The bank cannot see balances, so E1, E2 and E4 are checked only by the enclave. A remote reader holding the signing key cannot use it: the bank accepts results only from its own enclave, signed over a nonce it just chose, and offers no way to submit one. A host-level reader can answer the bank in the enclave's place: it signs results for states that never existed, with any balance, and redeems them. Enroll and refresh are exposed the same way: a signed enrollment can carry any balance, and a signed refresh can raise one. Neither reader can take anyone's existing state. |
 | Privacy toward the bank | **no**, for the requests read | For each payment it reads, the attacker learns the amount and both balances, and links it to the previous and the next payment of both participants, revealing the balances those payments left. An enroll it reads reveals `pk_0`, linking it to the user's first payment; a refresh reveals the balance and the next serial. Each channel key serves one request and is then erased, so requests not read during the break stay private. |
 
 ## 10. What the bank learns
@@ -191,7 +192,7 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 
 ## 11. Possible solutions for balance integrity
 
-**The goal:** the bank checks balance conservation itself, as it already checks ownership, while keeping Platypus's privacy. Without a cryptographic proof, the bank can only take a TEE's word on balances. The options either add a proof, or move that trust from the enclave's own key to the hardware vendor. For discussion:
+**The goal:** balance integrity without the key assumption: the bank checks balance conservation itself, as it already checks ownership, while keeping Platypus's privacy. Without a cryptographic proof, the bank can only take a TEE's word on balances. The options either add a proof, or move that trust from the enclave's own key to the hardware vendor. For discussion:
 
 | Option | Balance rests on | The bank sees who pays whom | Amounts hidden | Role of the TEE | Cost |
 |---|---|---|---|---|---|
