@@ -2,7 +2,7 @@
 
 Crate prefixes: `tv-` is tee-pay v2, this prototype; `pt-` is platypus-tee, the earlier prototype its attestation and transport crates are vendored from.
 
-Rust prototype of [round 1](../round-1/README.md) as revised at the advisor meeting of 2026-11-10: the enclave runs inside the bank's machine, serials are one-time Ed25519 public keys derived from a wallet seed, owners sign every payment, the bank checks those signatures itself (B1 to B4) and forwards the sealed openings to its own enclave (E1 to E4), which answers a signed result over the bank's fresh nonce (B3).
+Rust prototype of [round 1](../round-1/PROTOCOL.md) as revised at the advisor meeting of 2026-11-10: the enclave runs inside the bank's machine, serials are one-time Ed25519 public keys derived from a wallet seed, owners sign every payment, the bank checks those signatures itself (B1 to B4) and forwards the sealed openings to its own enclave (E1 to E4), which answers a signed result over the bank's fresh nonce (B3).
 
 **Status:** submitted with round 1 (2026-11-12). Runs on loopback with a mock enclave; not yet deployed on AWS Nitro.
 

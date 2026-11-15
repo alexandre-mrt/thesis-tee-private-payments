@@ -9,7 +9,7 @@ Can a trusted execution environment (TEE) run by a central bank replace the zero
 - **The idea.** Platypus's two zero-knowledge proofs are replaced by one check in a TEE (the enclave) that runs inside the bank. The enclave opens the hidden states and checks the balances, so the bank never sees amounts, balances, or who pays whom.
 - **The rule.** If the TEE breaks, only privacy may be lost: no money is created, stolen, spent twice or destroyed. No secret that can spend funds is ever sent to the TEE.
 - **How round 1 meets it.** Serials are one-time public keys derived from each user's seed. Owners sign every payment, and the bank checks those signatures and its spent set itself, so ownership, no double spend and no fund destruction hold even if the enclave's memory is read.
-- **The open gap.** Balance integrity still rests on the enclave's checks, accepted only from the bank's own enclave over its own channel. It holds against a remote reader of enclave memory, not against a host-level one; closing it needs a check the bank verifies itself ([round 1, section 11](round-1/README.md#11-possible-solutions-for-balance-integrity)).
+- **The open gap.** Balance integrity still rests on the enclave's checks, accepted only from the bank's own enclave over its own channel. It holds against a remote reader of enclave memory, not against a host-level one; closing it needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
 - **Status.** Scope and rule validated; round 1 and its Rust prototype (mock enclave, AWS Nitro deployment pending) submitted for validation.
 
 ## Contents
@@ -17,7 +17,7 @@ Can a trusted execution environment (TEE) run by a central bank replace the zero
 |---|---|---|
 | [Scope](#scope) | The setting, the direction, the deliverables | Validated (2026-10-19, 2026-10-29) |
 | [Foundation](#foundation-the-tee-protects-privacy-never-integrity) | The rule every design follows: the TEE protects privacy, never integrity | Rule validated (2026-10-19); consequences submitted |
-| [Round 1](round-1/README.md) | Platypus with one TEE call in place of the proofs; serials as one-time public keys | Submitted (2026-11-09), revised (2026-11-10) |
+| [Round 1](round-1/PROTOCOL.md) | Platypus with one TEE call in place of the proofs; serials as one-time public keys | Submitted (2026-11-09), revised (2026-11-10) |
 | [Implementation](implementation/README.md) | Rust prototype of round 1: bank, enclave, wallet, tests, benchmarks | Submitted (2026-11-12); mock enclave, Nitro deployment pending |
 
 Every design section and file states its status: **validated** cites the meeting, **submitted** awaits the next one. Meeting logistics (roadmap, validation log) are in [logistics/](logistics/).
@@ -68,7 +68,7 @@ From Alberto at the kickoff:
 ### The rule
 If the TEE breaks, **only privacy may be lost**. No money may be created, stolen, spent twice or destroyed. The bank must be able to reject every invalid payment **with checks it performs itself**. Those checks may rely on mathematics or on the bank's own records, never on a secret held by the TEE.
 
-**No secret that lets someone spend a user's funds or break integrity is ever sent to the TEE.** Users keep their secret seed and every signing key derived from it on their devices ([round 1, section 4](round-1/README.md#4-state-and-the-chain-of-ownership)). The TEE may receive the private data it needs to check a payment, such as balances and blinds, because a leak of that data costs privacy only. It never receives anything that can sign, spend or derive future keys.
+**No secret that lets someone spend a user's funds or break integrity is ever sent to the TEE.** Users keep their secret seed and every signing key derived from it on their devices ([round 1, section 4](round-1/PROTOCOL.md#4-state-and-the-chain-of-ownership)). The TEE may receive the private data it needs to check a payment, such as balances and blinds, because a leak of that data costs privacy only. It never receives anything that can sign, spend or derive future keys.
 
 ### What "the TEE breaks" means
 | The TEE... | Meaning | In scope |
@@ -127,9 +127,9 @@ Round 1 as revised at the advisor meeting of 2026-11-10 (the enclave runs inside
 | Holding limit respected | Claim 5.5 (holding limit only; no receiving limit yet) | enclave (E4) | holds | **lost** |
 | Privacy toward the bank | indistinguishability (5.3), bank only | enclave | lost for the requests read | lost for the requests read |
 
-Ownership integrity never depends on the enclave. Balance integrity survives a remote reader because the bank accepts results only from its own enclave, in answer to its own nonce; it is lost to a host-level reader, which can impersonate the enclave on that channel. Closing that last gap needs a check the bank verifies itself ([round 1, section 11](round-1/README.md#11-possible-solutions-for-balance-integrity)).
+Ownership integrity never depends on the enclave. Balance integrity survives a remote reader because the bank accepts results only from its own enclave, in answer to its own nonce; it is lost to a host-level reader, which can impersonate the enclave on that channel. Closing that last gap needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
 
 ### Where the designs stand
 | Design | Ownership integrity | Balance integrity | Status |
 |---|---|---|---|
-| [Round 1](round-1/README.md) | checked by the bank | checked by the enclave inside the bank; holds against a remote reader, not a host-level one | submitted 2026-11-09, revised 2026-11-10 |
+| [Round 1](round-1/PROTOCOL.md) | checked by the bank | checked by the enclave inside the bank; holds against a remote reader, not a host-level one | submitted 2026-11-09, revised 2026-11-10 |

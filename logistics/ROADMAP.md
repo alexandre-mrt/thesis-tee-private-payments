@@ -3,7 +3,7 @@
 ## Next meeting: to validate
 - [ ] The consequences of the foundation ([README.md](../README.md#what-follows-from-the-rule)); the rule itself is validated (2026-10-19).
 - [ ] Is the 2026-10-29 note "the TEE is trusted for correct execution, not for confidentiality" a transcription error? It conflicts with the kickoff principle.
-- [ ] [Round 1](../round-1/README.md): the design, its crash behaviour, and its check against the trust model.
+- [ ] [Round 1](../round-1/PROTOCOL.md): the design, its crash behaviour, and its check against the trust model.
 - [ ] Round 1's remaining dependence on the TEE: ownership is checked by the bank; balance rests on the enclave's result over the bank's own channel, so it holds against a remote reader and not a host-level one.
 - [ ] Which attacker the thesis targets: a remote reader or a host-level reader ([README.md](../README.md#who-reads-the-memory)).
 - [ ] [The round-1 prototype](../implementation/README.md) and its differences from round 1 ([DESIGN.md](../implementation/docs/DESIGN.md#differences-from-round-1)).
