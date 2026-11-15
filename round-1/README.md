@@ -253,5 +253,5 @@ Each serial is a fresh key used once, so the bank cannot link two payments by th
 | Abort | the payer's empty update | either party's refresh, checked by the enclave |
 | Extra pieces needed by the TEE | none | attestation and enclave registration, a fresh bank nonce per request, resealing after a crash, uniform refusals, idempotent settlement |
 | Public log | recent transactions only | every entry, so recovery can walk the chain from `pk_0` |
-| User-held state, spent-serial check, issuance | as in the paper | the same (issuance adds an issuance key, section 7) |
+| User-held state, spent set, issuance | as in the paper | the same (issuance adds an issuance key, section 7) |
 | Regulation | holding limit and receiving limit per epoch, checked in the proofs | holding limit `B_max` only (E4); receiving limits are left for a later round |
