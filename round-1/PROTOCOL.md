@@ -1,6 +1,6 @@
 # Round 1: Platypus with a TEE in place of the zero-knowledge proofs
 
-**Status:** submitted for advisor validation (2026-11-09), revised after the advisor meeting of 2026-11-10: the enclave runs inside the bank. The key assumption (2026-11-15) is submitted for validation. Builds on the [scope](../README.md#scope) and the [foundation](../README.md#foundation-the-tee-protects-privacy-never-integrity).
+**Status:** submitted for advisor validation (2026-11-09), revised after the advisor meeting of 2026-11-10: the enclave runs inside the bank. The advisors validated the key assumption at the same meeting. Builds on the [scope](../README.md#scope) and the [foundation](../README.md#foundation-the-tee-protects-privacy-never-integrity).
 
 | Design | Behaviour | Analysis |
 |---|---|---|

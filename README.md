@@ -10,7 +10,7 @@ Can a trusted execution environment (TEE) run by a central bank replace the zero
 - **The rule.** If the TEE breaks, only privacy may be lost: no money is created, stolen, spent twice or destroyed. No secret that can spend funds is ever sent to the TEE.
 - **How round 1 meets it.** Serials are one-time public keys derived from each user's seed. Owners sign every payment, and the bank checks those signatures and its spent set itself, so ownership, no double spend and no fund destruction hold even if the enclave's memory is read.
 - **The key assumption.** Balance integrity rests on the enclave's checks, accepted only from the bank's own enclave. The bank runs the TEE and is trusted for integrity, so the enclave's signing key is assumed not to leak, and balance integrity holds. Without that assumption it holds against a remote reader of enclave memory, not against a host-level one; dropping the assumption needs a check the bank verifies itself ([round 1, section 11](round-1/PROTOCOL.md#11-possible-solutions-for-balance-integrity)).
-- **Status.** Scope and rule validated; the key assumption, round 1 and its Rust prototype (mock enclave, AWS Nitro deployment pending) submitted for validation.
+- **Status.** Scope, rule and key assumption validated; round 1 and its Rust prototype (mock enclave, AWS Nitro deployment pending) submitted for validation.
 
 ## Contents
 | | Content | Status |
@@ -59,7 +59,7 @@ From Alberto at the kickoff:
 
 ## Foundation: the TEE protects privacy, never integrity
 
-**Status:** the rule is validated (kickoff, 2026-10-19). Its consequences below are submitted for validation (2026-11-09); the attacker classes and two consequences added on 2026-11-10 (prevent or detect; checks against the bank's own secrets) are submitted for validation; so is the key assumption (2026-11-15).
+**Status:** the rule is validated (kickoff, 2026-10-19). Its consequences below are submitted for validation (2026-11-09); the attacker classes and two consequences added on 2026-11-10 (prevent or detect; checks against the bank's own secrets) are submitted for validation. The key assumption is validated (advisors, 2026-11-10).
 
 > "TEE not for integrity but for privacy." (all advisors, kickoff 2026-10-19)
 >
@@ -80,7 +80,7 @@ If the TEE breaks, **only privacy may be lost**. No money may be created, stolen
 | **runs malicious code** | its code is replaced | no |
 
 #### Assumption: the enclave's signing key does not leak
-Submitted for validation (2026-11-15).
+Validated (advisors, 2026-11-10).
 
 The bank runs the TEE on its own machine, and only the bank's software talks to it. The bank is trusted for integrity, and that trust covers keeping its TEE intact: a TEE that anyone could run or answer for would not be trusted. The thesis therefore assumes that the enclave's signing key, which signs its results, never leaks, and that whoever can answer the bank in the enclave's place has compromised the bank itself, which is out of scope.
 
