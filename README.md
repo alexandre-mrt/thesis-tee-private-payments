@@ -4,6 +4,14 @@ EPFL master thesis at Mysten Labs (advisors Karl Wüst, Alberto Sonnino, Lefteri
 
 Can a trusted execution environment (TEE) run by a central bank replace the zero-knowledge proofs of a private payment system such as Platypus, so that a broken TEE costs privacy but never integrity?
 
+## In short
+- **Setting.** A central bank digital currency with a privacy focus, built on Platypus (Wüst et al., CCS 2022). The bank is trusted for integrity and honest-but-curious for privacy; users are untrusted.
+- **The idea.** Platypus's two zero-knowledge proofs are replaced by one check in a TEE (the enclave) that runs inside the bank. The enclave opens the hidden states and checks the balances, so the bank never sees amounts, balances, or who pays whom.
+- **The rule.** If the TEE breaks, only privacy may be lost: no money is created, stolen, spent twice or destroyed. No secret that can spend funds is ever sent to the TEE.
+- **How round 1 meets it.** Serials are one-time public keys derived from each user's seed. Owners sign every payment, and the bank checks those signatures and its spent set itself, so ownership, no double spend and no fund destruction hold even if the enclave's memory is read.
+- **The open gap.** Balance integrity still rests on the enclave's checks, accepted only from the bank's own enclave over its own channel. It holds against a remote reader of enclave memory, not against a host-level one; closing it needs a check the bank verifies itself ([round 1, section 11](round-1/README.md#11-possible-solutions-for-balance-integrity)).
+- **Status.** Scope and rule validated; round 1 and its Rust prototype (mock enclave, AWS Nitro deployment pending) submitted for validation.
+
 ## Contents
 | | Content | Status |
 |---|---|---|
