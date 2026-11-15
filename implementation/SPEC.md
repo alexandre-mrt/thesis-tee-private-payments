@@ -7,7 +7,7 @@ Prototype of round 1 as revised at the advisor meeting of 2026-11-10: **the encl
 | Party | Integrity | Privacy |
 |---|---|---|
 | Bank (process `tv-bank`) | trusted | honest-but-curious: must never see amounts, balances, or links between a spent serial and the state it spends |
-| Enclave (`tv-enclave`, inside the bank, reached only by the bank's process) | runs the attested code correctly; its memory may be read (then only privacy is lost) | protects what it processes |
+| Enclave (`tv-enclave`, inside the bank, reached only by the bank's process) | runs the attested code correctly; run by the bank, so its result key does not leak (key assumption); the rest of its memory may be read (then only privacy is lost) | protects what it processes |
 | Users (`tv-cli`) | untrusted | the protected party |
 
 Properties the tests must demonstrate, named after Platypus (Wüst et al., CCS 2022, Section 5):
