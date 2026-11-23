@@ -103,11 +103,11 @@ The distinction matters because "its code still runs correctly" already assumes 
 | **Ownership** | only the owner spends a state; a payment cannot be changed or redirected | must hold | must hold | **must hold** |
 | **Balance** | every payment moves exactly its amount; no money is created | must hold | must hold | **must hold** |
 | **No double spend** | each state is spent once | must hold | must hold | **must hold** |
-| **No fund destruction** | nobody can make another user's state unspendable | must hold | must hold | **must hold** |
+| **No fund destruction** (Platypus: availability of funds) | nobody can make another user's state unspendable | must hold | must hold | **must hold** |
 | **Privacy toward the bank** | the bank learns neither who pays whom, nor amounts, nor balances, nor which payments belong to the same user (for payments between users it does not collude with) | must hold | must hold | may be lost for the payments the TEE processed |
 | **Availability** | payments go through | must hold | paused until a new instance runs | not required |
 
-The integrity properties follow Platypus (Section 5): ownership is its transaction unforgeability (Claim 5.1), balance and no double spend are its balance invariance (Claim 5.2), and no fund destruction is Claim 5.4. The privacy property is its transaction indistinguishability (Claim 5.3, Definition 5.2) restricted to the bank as adversary; the paper's notion covers every party except the regulator.
+The integrity properties follow Platypus. Its *transaction integrity* (Section 5.1) covers transaction unforgeability (Claim 5.1) and balance invariance (Claim 5.2); we split it into *ownership integrity*, which the bank checks itself, and *balance integrity*, which rests on the enclave under the key assumption, because the two now rest on different parties ([Round 1 in Platypus's terms](#round-1-in-platypuss-terms)). No fund destruction is Platypus's availability of funds (Section 5.3, Claim 5.4), and regulation is its regulation integrity (Section 5.4, Claim 5.5). The privacy property is its transaction indistinguishability (Claim 5.3, Definition 5.2) restricted to the bank as adversary; the paper's notion covers every party except the regulator.
 
 ### What follows from the rule
 These consequences are derived, not yet validated.
@@ -119,9 +119,9 @@ These consequences are derived, not yet validated.
 - **The TEE's role is privacy and cost.** It can open states, hide who pays whom, or compute proofs on behalf of weak devices, provided the proof's witness holds no long-term spending key (Platypus's witness holds one). A break then leaks what it saw, and the bank's checks are unaffected.
 
 ### Round 1 in Platypus's terms
-Platypus groups integrity under **transaction integrity** (Section 5): **transaction unforgeability** (Claim 5.1: only authorized parties spend their funds, and values and recipients cannot be changed; this includes spending an account state that never came out of a transaction the bank accepted) and **balance invariance** (Claim 5.2: no funds are spent twice and the supply never grows). Claim 5.4 adds that nobody can invalidate another client's state, Claim 5.5 that no transaction breaks a regulation, and Claim 5.3 gives privacy as transaction indistinguishability.
+Platypus groups integrity under **transaction integrity** (Section 5.1): **transaction unforgeability** (Claim 5.1: only authorized parties spend their funds, and values and recipients cannot be changed; this includes spending an account state that never came out of a transaction the bank accepted) and **balance invariance** (Claim 5.2: no funds are spent twice and the supply never grows). **Availability of funds** (Section 5.3, Claim 5.4) adds that nobody can invalidate another client's state, **regulation integrity** (Section 5.4, Claim 5.5) that no transaction breaks a regulation, and **transaction indistinguishability** (Section 5.2, Claim 5.3) gives privacy.
 
-Round 1 as revised at the advisor meeting of 2026-11-10 (the enclave runs inside the bank, results never leave the bank's machine, submitted for validation) splits these into two kinds of integrity:
+Round 1 as revised at the advisor meeting of 2026-11-10 (the enclave runs inside the bank, results never leave the bank's machine, submitted for validation) splits transaction integrity into two kinds, because the two now rest on different parties:
 - **Ownership integrity:** nobody but the owner can spend, redirect or change a payment of a state. The bank checks it itself, with the owners' signatures under one-time keys that never reach the enclave.
 - **Balance integrity:** no money is printed. No state appears that the bank never issued, no balance is forged, every payment moves exactly its amount, and nothing is spent twice. The double-spend part is the bank's spent set; the rest rests on the enclave's checks, accepted only from the bank's own enclave over its own channel.
 
