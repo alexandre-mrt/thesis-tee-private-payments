@@ -3,11 +3,13 @@ use std::sync::{Arc, Mutex};
 
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::MakeWriter;
-use tv_core::{BankResponse, Bytes32, Opening};
+use tv_client::payment;
+use tv_core::{BankResponse, Bytes32, Opening, PairSecret};
 use tv_tests::{Harness, RESERVE};
 
 const ISSUED: u64 = 123_457;
 const PAID: u64 = 54_321;
+const MEMO: &str = "invoice-ZX81-confidential";
 
 fn renderings(bytes: &Bytes32) -> Vec<String> {
     vec![
@@ -65,6 +67,43 @@ async fn the_bank_view_holds_no_amount_balance_opening_or_next_serial() {
     assert!(view.contains(&serde_json::to_string(&spent_pk).unwrap()));
     assert!(
         view.contains(&serde_json::to_string(&alice.state().unwrap().state.commitment()).unwrap())
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_bank_view_holds_no_amount_blind_context_nonce_or_memo() {
+    let h = Harness::new().await;
+    let mut alice = h.wallet("alice");
+    let mut bob = h.wallet("bob");
+    h.enroll(&mut alice).await;
+    h.enroll(&mut bob).await;
+    h.issue(&mut alice, ISSUED).await.unwrap();
+    let request = payment::request_with_memo(&mut bob, &h.client, Some(PAID), Some(MEMO))
+        .await
+        .unwrap();
+    let offer = payment::pay(&mut alice, h.client.verifier(), &request).unwrap();
+    let pair = PairSecret::derive(&alice.current_key().unwrap(), &offer.pk_a, &offer.pk_b).unwrap();
+    let receipt = payment::receive(&mut bob, &h.client, &offer).await.unwrap();
+    tv_client::finish(&mut alice, &h.client, Some(&receipt))
+        .await
+        .unwrap();
+
+    let view = String::from_utf8(h.bank().view_bytes().unwrap()).unwrap();
+    assert!(view.contains(&serde_json::to_string(&offer.c_v).unwrap()));
+    assert!(view.contains(&serde_json::to_string(&offer.h_ctx).unwrap()));
+    for amount in [PAID, ISSUED - PAID] {
+        assert_absent(&view, "amount or balance", &[amount.to_string()]);
+    }
+    assert_absent(&view, "r_v", &renderings(&pair.r_v().unwrap()));
+    assert_absent(&view, "n_ctx", &renderings(&pair.n_ctx().unwrap()));
+    assert_absent(
+        &view,
+        "memo",
+        &[
+            MEMO.to_owned(),
+            hex::encode(MEMO),
+            serde_json::to_string(MEMO.as_bytes()).unwrap(),
+        ],
     );
 }
 
@@ -165,7 +204,17 @@ async fn the_bank_and_enclave_logs_name_no_refusal_reason_and_no_amount() {
     for variant in REFUSAL_VARIANTS {
         assert!(!logs.contains(variant), "{variant} leaked into the logs");
     }
+    let request = payment::request_with_memo(&mut bob, &h.client, Some(PAID), Some(MEMO))
+        .await
+        .unwrap();
+    let offer = payment::pay(&mut alice, h.client.verifier(), &request).unwrap();
+    let receipt = payment::receive(&mut bob, &h.client, &offer).await.unwrap();
+    tv_client::finish(&mut alice, &h.client, Some(&receipt))
+        .await
+        .unwrap();
+    let logs = capture.text();
     for amount in [ISSUED, PAID, ISSUED + 1, RESERVE - ISSUED] {
         assert_absent(&logs, "amount or balance", &[amount.to_string()]);
     }
+    assert_absent(&logs, "memo", &[MEMO.to_owned(), hex::encode(MEMO)]);
 }
