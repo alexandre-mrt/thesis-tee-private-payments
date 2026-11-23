@@ -177,7 +177,7 @@ enum Command {
         wallet: WalletArgs,
     },
     #[command(
-        about = "Replay the public log offline: owner signatures on recomputed digests (B2), no serial spent twice (B4)"
+        about = "Replay the public log offline: receipts and chain, owner signatures on recomputed digests (B2), no serial spent twice (B4)"
     )]
     VerifyLog {
         #[arg(long, help = "Bank data directory holding log.jsonl")]
@@ -264,9 +264,13 @@ async fn run_register(bank: String) -> anyhow::Result<String> {
 }
 
 fn verify_log(data: &Path) -> anyhow::Result<String> {
-    let audit = audit_entries(&read_log_entries(data)?)?;
+    let entries = read_log_entries(data)?;
+    let audit = audit_entries(&entries)?;
+    let head = entries
+        .last()
+        .map_or_else(|| "genesis".to_owned(), |e| hex::encode(e.chain));
     Ok(format!(
-        "log verified: {} entries, {} payments; owner signatures (B2) and serial uniqueness (B4) replayed",
+        "log verified: {} entries, {} payments; receipts and chain (receipt key in the header), owner signatures (B2) and serial uniqueness (B4) replayed; head {head}",
         audit.entries, audit.payments
     ))
 }
