@@ -60,6 +60,10 @@ pub enum BankError {
     KeyFile(String),
     #[error("the log was started under another receipt key than receipt.key")]
     ReceiptKeyMismatch,
+    #[error(
+        "the log header names receipt key {found}, not the pinned --receipt-pk {pinned}; the log was rewritten or belongs to another bank"
+    )]
+    LogReceiptKey { pinned: String, found: String },
     #[error("{path} is locked by another bank process")]
     Locked { path: String },
     #[error("log line {line} is corrupt: {reason}")]

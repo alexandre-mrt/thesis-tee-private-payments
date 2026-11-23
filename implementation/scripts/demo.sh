@@ -31,7 +31,7 @@ cli bob prove-payment --seq "${SEQ}" --mode designated --verifier-pk "${VERIFIER
 cli alice verify-proof --proof "${DATA}/proof-payee.json" --challenge "$(printf '22%.0s' {1..32})" --verifier-sk "${VERIFIER_SK}"
 
 echo "== the auditor replays the log"
-"${BIN}/tv-bank" verify-log --data "${BANK_DATA}"
+"${BIN}/tv-bank" verify-log --data "${BANK_DATA}" --receipt-pk "${RECEIPT_PK}"
 
 echo "== bob refreshes"
 cli bob refresh

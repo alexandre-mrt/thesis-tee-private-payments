@@ -16,7 +16,7 @@ use tv_bank::{
 use tv_client::error::describe;
 use tv_client::ops::{Session, balance};
 use tv_client::{Trust, parse_pcr0};
-use tv_core::{BankRequest, BankResponse};
+use tv_core::{BankRequest, BankResponse, Bytes32};
 
 const SERVE_LOG_FILTER: &str = "info";
 const COMMAND_LOG_FILTER: &str = "warn";
@@ -182,6 +182,13 @@ enum Command {
     VerifyLog {
         #[arg(long, help = "Bank data directory holding log.jsonl")]
         data: PathBuf,
+        #[arg(
+            long,
+            value_name = "HEX",
+            value_parser = parse_receipt_pk,
+            help = "Receipt key the auditor trusts (printed by init); the log header must name it"
+        )]
+        receipt_pk: Bytes32,
     },
     #[command(about = "Print the bank wallet balance (local read)")]
     Balance {
@@ -263,14 +270,21 @@ async fn run_register(bank: String) -> anyhow::Result<String> {
     }
 }
 
-fn verify_log(data: &Path) -> anyhow::Result<String> {
-    let entries = read_log_entries(data)?;
+fn parse_receipt_pk(text: &str) -> Result<Bytes32, String> {
+    hex::decode(text.trim())
+        .map_err(|_| "--receipt-pk is not hex".to_owned())?
+        .try_into()
+        .map_err(|_| "--receipt-pk is not 32 bytes".to_owned())
+}
+
+fn verify_log(data: &Path, receipt_pk: &Bytes32) -> anyhow::Result<String> {
+    let entries = read_log_entries(data, receipt_pk)?;
     let audit = audit_entries(&entries)?;
     let head = entries
         .last()
         .map_or_else(|| "genesis".to_owned(), |e| hex::encode(e.chain));
     Ok(format!(
-        "log verified: {} entries, {} payments; receipts and chain (receipt key in the header), owner signatures (B2) and serial uniqueness (B4) replayed; head {head}",
+        "log verified: {} entries, {} payments; receipts and chain under the pinned receipt key, owner signatures (B2) and serial uniqueness (B4) replayed; head {head}",
         audit.entries, audit.payments
     ))
 }
@@ -325,7 +339,7 @@ async fn run(cli: Cli) -> anyhow::Result<Option<String>> {
         Command::Recover { wallet } => {
             Some(tv_bank::genesis::recover(&wallet.data, &wallet.session()?).await?)
         }
-        Command::VerifyLog { data } => Some(verify_log(&data)?),
+        Command::VerifyLog { data, receipt_pk } => Some(verify_log(&data, &receipt_pk)?),
         Command::Balance { data } => Some(balance(&bank_wallet_path(&data))?),
     })
 }
@@ -345,33 +359,5 @@ async fn main() {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn filter_of(args: &[&str]) -> &'static str {
-        Cli::try_parse_from(args)
-            .unwrap()
-            .command
-            .default_log_filter()
-    }
-
-    #[test]
-    fn only_serve_logs_at_info_by_default() {
-        assert_eq!(
-            filter_of(&["tv-bank", "serve", "--data", "d", "--allow-mock"]),
-            SERVE_LOG_FILTER
-        );
-        assert_eq!(
-            filter_of(&["tv-bank", "balance", "--data", "d"]),
-            COMMAND_LOG_FILTER
-        );
-        assert_eq!(
-            filter_of(&["tv-bank", "init", "--data", "d"]),
-            COMMAND_LOG_FILTER
-        );
-        assert_eq!(
-            filter_of(&["tv-bank", "register-enclave"]),
-            COMMAND_LOG_FILTER
-        );
-    }
-}
+#[path = "cli_tests.rs"]
+mod tests;

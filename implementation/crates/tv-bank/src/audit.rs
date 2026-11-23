@@ -118,9 +118,15 @@ pub fn audit_entries(entries: &[LogEntry]) -> Result<Audit, AuditError> {
     Ok(replay.audit)
 }
 
-pub fn read_log_entries(dir: &Path) -> Result<Vec<LogEntry>, BankError> {
+pub fn read_log_entries(dir: &Path, receipt_pk: &Bytes32) -> Result<Vec<LogEntry>, BankError> {
     let path = dir.join(LOG_FILE);
     let bytes = std::fs::read(&path).map_err(BankError::file(&path))?;
     let (index, _) = replay(&bytes)?;
+    if index.receipt_pk() != *receipt_pk {
+        return Err(BankError::LogReceiptKey {
+            pinned: hex::encode(receipt_pk),
+            found: hex::encode(index.receipt_pk()),
+        });
+    }
     Ok(index.into_entries())
 }

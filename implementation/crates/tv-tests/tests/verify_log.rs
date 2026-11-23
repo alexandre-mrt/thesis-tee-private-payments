@@ -1,6 +1,7 @@
-use tv_bank::{AuditError, audit_entries, read_log_entries};
+use tv_bank::flight::{header, trailer};
+use tv_bank::{AuditError, BankError, LOG_FILE, audit_entries, read_log_entries, read_receipt_pk};
 use tv_client::{Wallet, flows};
-use tv_core::{LogEntry, OpKind, Signature};
+use tv_core::{LogEntry, OpKind, Signature, SigningKey, chain_genesis};
 use tv_tests::Harness;
 
 async fn busy_log(h: &Harness) -> (Wallet, Wallet) {
@@ -41,7 +42,8 @@ async fn verify_log_replays_b2_and_b4_on_the_live_log_and_on_disk() {
             .iter()
             .all(|e| (e.kind == OpKind::Pay) == (e.c_v.is_some() && e.h_ctx.is_some()))
     );
-    assert_eq!(read_log_entries(h.dir()).unwrap(), entries);
+    let receipt_pk = read_receipt_pk(h.dir()).unwrap();
+    assert_eq!(read_log_entries(h.dir(), &receipt_pk).unwrap(), entries);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -83,4 +85,44 @@ async fn verify_log_fails_on_a_serial_spent_twice_or_a_replaced_owner_signature(
         audit_entries(&gap),
         Err(AuditError::Sequence { position: 0, .. })
     ));
+}
+
+fn rewritten_log(key: &SigningKey, entries: &[LogEntry]) -> Vec<u8> {
+    let mut head = chain_genesis(&key.public_key());
+    let mut bytes = header(&key.public_key());
+    for entry in entries {
+        let sealed = entry.clone().sealed(&head, key);
+        head = sealed.chain;
+        let mut line = serde_json::to_vec(&sealed).unwrap();
+        line.push(b'\n');
+        bytes.extend_from_slice(&line);
+        bytes.extend_from_slice(&trailer(&line));
+    }
+    bytes
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn verify_log_refuses_a_log_rewritten_under_a_fresh_receipt_key() {
+    let h = Harness::new().await;
+    busy_log(&h).await;
+    let entries = h.bank().entries();
+    let receipt_pk = read_receipt_pk(h.dir()).unwrap();
+    let forger = SigningKey::generate();
+    let dir = h.dir().join("rewritten");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(LOG_FILE), rewritten_log(&forger, &entries)).unwrap();
+
+    assert_eq!(
+        read_log_entries(&dir, &forger.public_key()).unwrap().len(),
+        entries.len()
+    );
+    let refused = read_log_entries(&dir, &receipt_pk).unwrap_err();
+    assert!(
+        matches!(refused, BankError::LogReceiptKey { .. }),
+        "{refused}"
+    );
+    assert!(
+        refused.to_string().contains(&hex::encode(receipt_pk)),
+        "{refused}"
+    );
 }
