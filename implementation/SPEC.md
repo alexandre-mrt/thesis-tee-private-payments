@@ -11,9 +11,9 @@ Prototype of round 1 as revised at the advisor meeting of 2026-11-10: **the encl
 | Users (`tv-cli`) | untrusted | the protected party |
 
 Properties the tests must demonstrate, named after Platypus (Wüst et al., CCS 2022, Section 5):
-- **P1 ownership integrity** (Platypus transaction unforgeability, Claim 5.1): nobody spends, redirects or changes a payment of a state without the owner's signature under its one-time key. Holds even if the enclave's memory and keys are read.
-- **P2 balance integrity** (Platypus balance invariance, Claim 5.2): no money is created or destroyed: every payment moves exactly `v`, `0 < v <= b_A`, `b_B + v <= B_MAX` (except bank states), each state is spent once. Rests on the enclave's checks plus the bank's channel: results are accepted only from the bank's own enclave, in answer to a nonce the bank chose.
-- **P3 no fund destruction** (Claim 5.4): nobody can burn another user's state.
+- **P1 ownership integrity** (first half of Platypus's transaction integrity, Section 5.1: the authorisation part of transaction unforgeability, Claim 5.1): nobody spends, redirects or changes a payment of a state without the owner's signature under its one-time key. Holds even if the enclave's memory and keys are read.
+- **P2 balance integrity** (second half of Platypus's transaction integrity: balance invariance, Claim 5.2, and the never-issued state case of Claim 5.1): no money is created or destroyed: every payment moves exactly `v`, `0 < v <= b_A`, `b_B + v <= B_MAX` (except bank states), each state is spent once. Rests on the enclave's checks plus the bank's channel: results are accepted only from the bank's own enclave, in answer to a nonce the bank chose.
+- **P3 no fund destruction** (Platypus availability of funds, Claim 5.4): nobody can burn another user's state.
 - **P4 privacy toward the bank** (transaction indistinguishability, Claim 5.3, restricted to the bank): the bank's view contains no amount, balance, or next serial.
 - **P5 crash safety**: a crash of the enclave or the bank at any point loses or duplicates no value; a retry gets the stored answer.
 
