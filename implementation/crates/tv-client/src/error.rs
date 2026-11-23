@@ -116,6 +116,8 @@ pub enum ClientError {
     Clock,
     #[error("recovery failed: {0}")]
     Recover(String),
+    #[error("the bank's receipt does not verify: {what}")]
+    BadReceipt { what: &'static str },
     #[error("the offer's {what} does not match this request; nothing was signed")]
     OfferEvidence { what: &'static str },
 }

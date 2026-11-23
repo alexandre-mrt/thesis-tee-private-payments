@@ -1,11 +1,13 @@
 use tracing::warn;
 use tv_core::{
-    BankRequest, BankResponse, Bytes32, EnrollRequest, EnrollSecret, OpKind, RefreshRequest,
-    RefreshSecret, Signature, State, commitment, enroll_digest, refresh_digest, sign_digest,
+    BankRequest, BankResponse, Bytes32, EnrollRequest, EnrollSecret, LogEntry, OpKind, Receipt,
+    RefreshRequest, RefreshSecret, Signature, State, commitment, enroll_digest, refresh_digest,
+    sign_digest,
 };
 
 use crate::bank::{Attested, BankClient, seal_to};
 use crate::error::{ClientError, PAY_NOT_SETTLED, RETRY_ENROLL, RETRY_REFRESH};
+use crate::evidence::{Single, check_entry, single_entry};
 use crate::files::ReceiptFile;
 use crate::wallet::{Pending, Wallet};
 
@@ -14,6 +16,11 @@ pub fn check_manifest(wallet: &Wallet, attested: &Attested) -> Result<(), Client
         return Err(ClientError::BankKeyMismatch);
     }
     Ok(())
+}
+
+fn settled_single(wallet: &Wallet, op: &Single, receipt: &Receipt) -> Result<(), ClientError> {
+    wallet.verify_new_state(&op.com, &op.sig)?;
+    check_entry(wallet, &single_entry(op, receipt))
 }
 
 pub async fn enroll(wallet: &mut Wallet, bank: &BankClient) -> Result<(), ClientError> {
@@ -34,24 +41,24 @@ pub async fn enroll(wallet: &mut Wallet, bank: &BankClient) -> Result<(), Client
     let attested = bank.attest(&pk0).await?;
     check_manifest(wallet, &attested)?;
     let sealed = seal_to(&attested.channel_pk, &EnrollSecret { r0 })?;
+    let owner_sig = sign_digest(&key, &digest);
     let request = BankRequest::Enroll(Box::new(EnrollRequest {
         channel_pk: attested.channel_pk,
         pk0,
         com0,
-        sig: sign_digest(&key, &digest),
+        sig: owner_sig,
         sealed,
     }));
     match bank.call(&request).await? {
-        BankResponse::Enrolled { sig, .. } => {
-            wallet.verify_new_state(&com0, &sig)?;
-            wallet.set_enrolled(
-                State {
-                    balance: 0,
-                    pk: pk0,
-                    r: r0,
-                },
-                sig,
-            )
+        BankResponse::Enrolled { sig, receipt } => {
+            let op = Single::new(OpKind::Enroll, (pk0, com0), (sig, owner_sig), digest);
+            settled_single(wallet, &op, &receipt)?;
+            let state = State {
+                balance: 0,
+                pk: pk0,
+                r: r0,
+            };
+            wallet.set_enrolled(state, sig)
         }
         BankResponse::Unavailable => Err(ClientError::Unavailable {
             retry: RETRY_ENROLL,
@@ -145,16 +152,18 @@ async fn move_to_next_serial(
             opening: wallet.opening()?,
         },
     )?;
+    let owner_sig = sign_digest(&key, &digest);
     let request = BankRequest::Refresh(Box::new(RefreshRequest {
         channel_pk: attested.channel_pk,
         pk,
         com_next,
-        sig: sign_digest(&key, &digest),
+        sig: owner_sig,
         sealed,
     }));
     match bank.call(&request).await? {
-        BankResponse::Refreshed { sig, .. } => {
-            wallet.verify_new_state(&com_next, &sig)?;
+        BankResponse::Refreshed { sig, receipt } => {
+            let op = Single::new(OpKind::Refresh, (pk, com_next), (sig, owner_sig), digest);
+            settled_single(wallet, &op, &receipt)?;
             wallet.advance(balance, sig)
         }
         BankResponse::Unavailable => Err(ClientError::Unavailable {
@@ -178,13 +187,21 @@ async fn refusal_of(bank: &BankClient, serial: &Bytes32) -> ClientError {
     }
 }
 
+fn entry_sig(wallet: &Wallet, entry: &LogEntry, com: &Bytes32) -> Result<Signature, ClientError> {
+    check_entry(wallet, entry)?;
+    entry
+        .sig_for(com)
+        .ok_or(ClientError::Mismatch { what: "log entry" })
+}
+
 async fn lookup_sig(
+    wallet: &Wallet,
     bank: &BankClient,
     kind: OpKind,
-    serial: &Bytes32,
     digest: &Bytes32,
     com: &Bytes32,
 ) -> Result<Signature, ClientError> {
+    let serial = &wallet.current_pk()?;
     let next = match kind {
         OpKind::Pay => PAY_NOT_SETTLED,
         OpKind::Enroll => RETRY_ENROLL,
@@ -200,9 +217,7 @@ async fn lookup_sig(
             serial: hex::encode(serial),
         });
     }
-    entry
-        .sig_for(com)
-        .ok_or(ClientError::Mismatch { what: "log entry" })
+    entry_sig(wallet, &entry, com)
 }
 
 pub async fn finish(
@@ -223,9 +238,11 @@ pub async fn finish(
             ..
         } => {
             let sig = match receipt {
-                Some(r) if r.digest == digest && r.com_a_next == com_a_next => r.sig_a_next,
+                Some(r) if r.entry.digest == digest && r.entry.serials.first() == Some(&pk) => {
+                    entry_sig(wallet, &r.entry, &com_a_next)?
+                }
                 Some(_) => return Err(ClientError::Mismatch { what: "receipt" }),
-                None => lookup_sig(bank, OpKind::Pay, &pk, &digest, &com_a_next).await?,
+                None => lookup_sig(wallet, bank, OpKind::Pay, &digest, &com_a_next).await?,
             };
             wallet.verify_new_state(&com_a_next, &sig)?;
             let balance = wallet
@@ -238,12 +255,12 @@ pub async fn finish(
             wallet.advance(balance, sig)
         }
         Pending::Refresh { com_next, digest } => {
-            let sig = lookup_sig(bank, OpKind::Refresh, &pk, &digest, &com_next).await?;
+            let sig = lookup_sig(wallet, bank, OpKind::Refresh, &digest, &com_next).await?;
             wallet.verify_new_state(&com_next, &sig)?;
             wallet.advance(wallet.balance(), sig)
         }
         Pending::Enroll { com0, digest } => {
-            let sig = lookup_sig(bank, OpKind::Enroll, &pk, &digest, &com0).await?;
+            let sig = lookup_sig(wallet, bank, OpKind::Enroll, &digest, &com0).await?;
             wallet.verify_new_state(&com0, &sig)?;
             let r = wallet.r_at(wallet.index())?;
             wallet.set_enrolled(State { balance: 0, pk, r }, sig)

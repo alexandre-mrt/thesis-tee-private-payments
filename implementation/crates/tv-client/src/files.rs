@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::warn;
-use tv_core::{Bytes32, PayFields, SealedBlob, Signature, pay_digest};
+use tv_core::{Bytes32, LogEntry, PayFields, SealedBlob, Signature, pay_digest};
 
 use crate::attest::AttestationBundle;
 use crate::error::ClientError;
@@ -48,10 +48,8 @@ impl OfferFile {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptFile {
-    pub digest: Bytes32,
-    pub pk_a: Bytes32,
-    pub com_a_next: Bytes32,
-    pub sig_a_next: Signature,
+    pub entry: LogEntry,
+    pub memo: String,
 }
 
 pub fn file_error(what: &'static str, path: &Path, reason: &dyn std::fmt::Display) -> ClientError {

@@ -1,5 +1,5 @@
 use tv_bank::read_receipt_pk;
-use tv_client::{Wallet, flows, payment};
+use tv_client::{ClientError, Wallet, flows, payment};
 use tv_core::{
     BankRequest, BankResponse, LogEntry, OpKind, VerifyingKey, chain_genesis, encode_cbor,
 };
@@ -63,4 +63,36 @@ async fn nr2_settled_carries_the_entry_receipt_and_a_retry_after_a_bank_crash_is
     let again = h.client.call(&receive).await.unwrap();
     assert_eq!(encode_cbor(&again).unwrap(), encode_cbor(&first).unwrap());
     assert_eq!(h.bank().entries().last(), Some(&entry));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn c3_the_payer_refuses_a_receipt_whose_bank_or_owner_signatures_do_not_verify() {
+    let h = Harness::new().await;
+    let (mut alice, mut bob) = funded(&h).await;
+    let request = payment::request(&mut bob, &h.client, Some(40))
+        .await
+        .unwrap();
+    let offer = payment::pay(&mut alice, h.client.verifier(), &request).unwrap();
+    let receipt = payment::receive(&mut bob, &h.client, &offer).await.unwrap();
+    let mut forged = receipt.clone();
+    forged.entry.rcpt.0[0] ^= 1;
+    assert!(matches!(
+        flows::finish(&mut alice, &h.client, Some(&forged)).await,
+        Err(ClientError::BadReceipt {
+            what: "receipt signature"
+        })
+    ));
+    let mut swapped = receipt.clone();
+    swapped.entry.owner_sigs.reverse();
+    assert!(matches!(
+        flows::finish(&mut alice, &h.client, Some(&swapped)).await,
+        Err(ClientError::BadReceipt {
+            what: "owner signatures"
+        })
+    ));
+    assert_eq!(alice.balance(), 500);
+    flows::finish(&mut alice, &h.client, Some(&receipt))
+        .await
+        .unwrap();
+    assert_eq!(alice.balance(), 460);
 }

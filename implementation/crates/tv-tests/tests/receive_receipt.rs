@@ -59,7 +59,7 @@ async fn a_receipt_that_cannot_be_written_leaves_the_wallet_pending_and_the_retr
     assert_eq!(bob.balance(), 10);
     assert_eq!(bob.index(), 2);
     let receipt: ReceiptFile = read_json(&receipt_path, "receipt").unwrap();
-    assert_eq!(receipt.pk_a, alice.current_pk().unwrap());
+    assert_eq!(receipt.entry.serials[0], alice.current_pk().unwrap());
     flows::finish(&mut alice, &h.client, Some(&receipt))
         .await
         .unwrap();

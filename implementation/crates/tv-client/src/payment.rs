@@ -7,6 +7,7 @@ use tv_core::{
 use crate::attest::verify_bundle;
 use crate::bank::{BankClient, seal_to};
 use crate::error::{ClientError, RETRY_RECEIVE};
+use crate::evidence::{check_entry, pay_entry};
 use crate::files::{OfferFile, ReceiptFile, RequestFile};
 use crate::flows::check_manifest;
 use crate::wallet::{Pending, Wallet};
@@ -209,9 +210,8 @@ pub fn prepare_pay(
 
 pub struct PreparedReceive {
     request: BankRequest,
-    digest: Bytes32,
-    pk_a: Bytes32,
-    com_a_next: Bytes32,
+    public: PayPublic,
+    memo: String,
     com_b_next: Bytes32,
     balance_next: u64,
     result_pk: Bytes32,
@@ -284,26 +284,26 @@ pub fn prepare_receive(wallet: &Wallet, offer: &OfferFile) -> Result<PreparedRec
             opening: wallet.opening()?,
         },
     )?;
+    let public = PayPublic {
+        pk_a: offer.pk_a,
+        com_a_next: offer.com_a_next,
+        sig_a: offer.sig_a,
+        pk_b,
+        com_b_next: com_next,
+        sig_b: sign_digest(&key, &digest),
+        c_v: offer.c_v,
+        h_ctx: offer.h_ctx,
+    };
     let request = BankRequest::Receive(Box::new(Receive {
         channel_pk,
-        public: PayPublic {
-            pk_a: offer.pk_a,
-            com_a_next: offer.com_a_next,
-            sig_a: offer.sig_a,
-            pk_b,
-            com_b_next: com_next,
-            sig_b: sign_digest(&key, &digest),
-            c_v: offer.c_v,
-            h_ctx: offer.h_ctx,
-        },
+        public,
         payer: offer.payer.clone(),
         payee,
     }));
     Ok(PreparedReceive {
         request,
-        digest,
-        pk_a: offer.pk_a,
-        com_a_next: offer.com_a_next,
+        public,
+        memo,
         com_b_next: com_next,
         balance_next: payee_balance(signed.state.balance, v)?,
         result_pk,
@@ -319,15 +319,15 @@ pub async fn submit_receive(
         BankResponse::Settled {
             sig_a_next,
             sig_b_next,
-            ..
+            receipt,
         } => {
             wallet.verify_new_state(&prepared.com_b_next, &sig_b_next)?;
+            let entry = pay_entry(&prepared.public, sig_a_next, sig_b_next, &receipt);
+            check_entry(wallet, &entry)?;
             Ok(Settlement {
                 receipt: ReceiptFile {
-                    digest: prepared.digest,
-                    pk_a: prepared.pk_a,
-                    com_a_next: prepared.com_a_next,
-                    sig_a_next,
+                    entry,
+                    memo: prepared.memo.clone(),
                 },
                 com_b_next: prepared.com_b_next,
                 balance_next: prepared.balance_next,

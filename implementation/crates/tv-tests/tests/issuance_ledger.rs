@@ -37,7 +37,7 @@ async fn issue_records_the_amount_in_a_private_ledger_and_not_in_the_public_log(
     let record = &ledger[0];
     assert_eq!(record.amount, ISSUED);
     assert_eq!(record.payee, payee);
-    assert_eq!(record.digest, receipt.digest);
+    assert_eq!(record.digest, receipt.entry.digest);
     assert!(record.unix_secs > 0);
 
     let view = String::from_utf8(h.bank().view_bytes().unwrap()).unwrap();
@@ -91,7 +91,7 @@ async fn issue_writes_no_offer_and_commits_nothing_when_the_ledger_cannot_be_wri
     let ledger = read_issuances(h.dir()).unwrap();
     assert_eq!(ledger.len(), 1);
     assert_eq!(ledger[0].amount, ISSUED);
-    assert_eq!(ledger[0].digest, receipt.digest);
+    assert_eq!(ledger[0].digest, receipt.entry.digest);
 }
 
 #[tokio::test(flavor = "multi_thread")]

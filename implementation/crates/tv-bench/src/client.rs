@@ -187,9 +187,6 @@ fn enclave_attest_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
 
 fn file_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
     let public = s.payment.receive.public;
-    let BankResponse::Settled { sig_a_next, .. } = s.settled else {
-        bail!("payment not settled: {:?}", s.settled);
-    };
     let request_file = RequestFile {
         v: 1,
         pk_b: public.pk_b,
@@ -209,10 +206,8 @@ fn file_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
         h_ctx: public.h_ctx,
     };
     let receipt_file = ReceiptFile {
-        digest: public.digest(),
-        pk_a: public.pk_a,
-        com_a_next: public.com_a_next,
-        sig_a_next,
+        entry: s.entry.clone(),
+        memo: String::new(),
     };
     Ok(vec![
         ("file request.json".to_owned(), file(&request_file)?),

@@ -3,6 +3,7 @@
 pub mod attest;
 pub mod bank;
 pub mod error;
+pub mod evidence;
 pub mod files;
 pub mod flows;
 pub mod ops;
