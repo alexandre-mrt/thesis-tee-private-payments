@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod audit;
 pub mod bank;
 pub mod commit;
 pub mod error;
@@ -17,6 +18,7 @@ pub mod registry;
 pub mod server;
 pub mod store;
 
+pub use audit::{Audit, AuditError, audit_entries, read_log_entries};
 pub use bank::{BANK_SOURCE, Bank, Outcome, Policy};
 pub use commit::{Committer, SharedStore};
 pub use error::{BankError, LinkError};

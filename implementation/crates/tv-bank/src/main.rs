@@ -10,8 +10,8 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 use tv_bank::{
     Bank, DEFAULT_ENCLAVE, DEFAULT_LISTEN, DEFAULT_RESERVE, EnclaveTrust, Policy, ServerConfig,
-    TcpLink, bank_wallet_path, bind, crash_after_append, exit_after_append_hook, init, issue,
-    parse_enclave, serve,
+    TcpLink, audit_entries, bank_wallet_path, bind, crash_after_append, exit_after_append_hook,
+    init, issue, parse_enclave, read_log_entries, serve,
 };
 use tv_client::error::describe;
 use tv_client::ops::{Session, balance};
@@ -176,6 +176,13 @@ enum Command {
         #[command(flatten)]
         wallet: WalletArgs,
     },
+    #[command(
+        about = "Replay the public log offline: owner signatures on recomputed digests (B2), no serial spent twice (B4)"
+    )]
+    VerifyLog {
+        #[arg(long, help = "Bank data directory holding log.jsonl")]
+        data: PathBuf,
+    },
     #[command(about = "Print the bank wallet balance (local read)")]
     Balance {
         #[arg(long, help = "Bank data directory (keys, log.jsonl, bank-wallet.json)")]
@@ -256,6 +263,14 @@ async fn run_register(bank: String) -> anyhow::Result<String> {
     }
 }
 
+fn verify_log(data: &Path) -> anyhow::Result<String> {
+    let audit = audit_entries(&read_log_entries(data)?)?;
+    Ok(format!(
+        "log verified: {} entries, {} payments; owner signatures (B2) and serial uniqueness (B4) replayed",
+        audit.entries, audit.payments
+    ))
+}
+
 fn describe_keys(keys: &BankKeys) -> String {
     format!(
         "state_pk={}\nissuance_pk={}",
@@ -306,6 +321,7 @@ async fn run(cli: Cli) -> anyhow::Result<Option<String>> {
         Command::Recover { wallet } => {
             Some(tv_bank::genesis::recover(&wallet.data, &wallet.session()?).await?)
         }
+        Command::VerifyLog { data } => Some(verify_log(&data)?),
         Command::Balance { data } => Some(balance(&bank_wallet_path(&data))?),
     })
 }

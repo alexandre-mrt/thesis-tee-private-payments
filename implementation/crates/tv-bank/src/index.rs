@@ -119,6 +119,10 @@ impl Index {
         &self.entries
     }
 
+    pub fn into_entries(self) -> Vec<LogEntry> {
+        self.entries
+    }
+
     pub fn spent_count(&self) -> usize {
         self.spent.len()
     }
