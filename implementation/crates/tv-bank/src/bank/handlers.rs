@@ -3,7 +3,8 @@ use tv_core::{
     refresh_digest, verify_digest,
 };
 
-use super::{Bank, Outcome, Settlement};
+use super::settle::Settlement;
+use super::{Bank, Outcome};
 use crate::journal::LogWriter;
 use crate::link::EnclaveLink;
 
