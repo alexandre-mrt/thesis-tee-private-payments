@@ -36,6 +36,7 @@ pub enum Pending {
         com_b_next: Bytes32,
         com_a_next: Bytes32,
         digest: Bytes32,
+        h_ctx: Bytes32,
         memo: String,
     },
     Refresh {

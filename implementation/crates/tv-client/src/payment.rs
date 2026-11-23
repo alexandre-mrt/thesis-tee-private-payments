@@ -101,16 +101,25 @@ pub async fn request_with_memo(
     })
 }
 
-fn payer_commitment(wallet: &Wallet, request: &RequestFile) -> Result<Bytes32, ClientError> {
+fn payer_commitment(
+    wallet: &Wallet,
+    request: &RequestFile,
+    h_ctx: &Bytes32,
+) -> Result<Bytes32, ClientError> {
     match wallet.pending().cloned() {
         Some(Pending::Pay {
             v,
             pk_b,
             com_b_next,
             com_a_next,
+            h_ctx: kept,
             ..
         }) => {
-            if v != request.v || pk_b != request.pk_b || com_b_next != request.com_b_next {
+            if v != request.v
+                || pk_b != request.pk_b
+                || com_b_next != request.com_b_next
+                || kept != *h_ctx
+            {
                 return Err(ClientError::PayRequestMismatch);
             }
             Ok(com_a_next)
@@ -161,7 +170,6 @@ pub fn prepare_pay(
     if request.v == 0 {
         return Err(ClientError::ZeroAmount);
     }
-    let com_a_next = payer_commitment(wallet, request)?;
     let key = wallet.current_key()?;
     let pk_a = key.public_key();
     if pk_a == request.pk_b {
@@ -170,6 +178,7 @@ pub fn prepare_pay(
     let pair = PairSecret::derive(&key, &pk_a, &request.pk_b)?;
     let c_v = pair.amount_commitment(request.v)?;
     let h_ctx = pair.context_hash(request.memo.as_bytes())?;
+    let com_a_next = payer_commitment(wallet, request, &h_ctx)?;
     let digest = pay_digest(&PayFields {
         pk_a: &pk_a,
         com_a_next: &com_a_next,
@@ -204,6 +213,7 @@ pub fn prepare_pay(
             com_b_next: request.com_b_next,
             com_a_next,
             digest,
+            h_ctx,
             memo: request.memo.clone(),
         },
     })

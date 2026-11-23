@@ -102,7 +102,10 @@ async fn a_payer_whose_request_was_abandoned_is_told_to_force_refresh() {
         "{mismatch}"
     );
     let text = mismatch.to_string();
-    assert!(text.contains("another payee serial or amount"), "{text}");
+    assert!(
+        text.contains("another payee serial, amount or memo"),
+        "{text}"
+    );
     assert!(
         text.contains("`tv-cli refresh --force`, then `tv-cli pay`"),
         "{text}"

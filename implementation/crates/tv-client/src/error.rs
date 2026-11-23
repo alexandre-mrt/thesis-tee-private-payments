@@ -67,7 +67,7 @@ pub enum ClientError {
     #[error("{what} does not match the pending operation")]
     Mismatch { what: &'static str },
     #[error(
-        "the request names another payee serial or amount than the pending payment; complete that payment with `tv-cli finish`, or, if the payee abandoned it, run `tv-cli refresh --force`, then `tv-cli pay` the new request"
+        "the request names another payee serial, amount or memo than the pending payment; complete that payment with `tv-cli finish`, or, if the payee abandoned it, run `tv-cli refresh --force`, then `tv-cli pay` the new request"
     )]
     PayRequestMismatch,
     #[error(
@@ -234,6 +234,7 @@ mod tests {
             com_b_next: zero,
             com_a_next: zero,
             digest: zero,
+            h_ctx: zero,
             memo: String::new(),
         };
         let refresh = Pending::Refresh {

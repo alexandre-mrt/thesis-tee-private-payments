@@ -126,3 +126,28 @@ async fn pay_to_a_request_naming_the_payers_own_serial_is_a_self_payment() {
     assert!(wallet.pending().is_none());
     assert_eq!(wallet.balance(), 500);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_retried_pay_refuses_a_request_with_another_memo() {
+    let h = Harness::new().await;
+    let mut bob = h.wallet("bob");
+    h.enroll(&mut bob).await;
+    let alice = funded_payer(&h, "alice", 500).await;
+    let request = payment::request_with_memo(&mut bob, &h.client, Some(70), Some("rent"))
+        .await
+        .unwrap();
+    let mut wallet = alice.wallet();
+    let offer = payment::pay(&mut wallet, h.client.verifier(), &request).unwrap();
+    let kept = wallet.pending().cloned();
+
+    let mut rewritten = request.clone();
+    rewritten.memo = "gift".to_owned();
+    let err = payment::pay(&mut wallet, h.client.verifier(), &rewritten).unwrap_err();
+    assert!(matches!(err, ClientError::PayRequestMismatch), "{err}");
+    assert!(err.to_string().contains("memo"), "{err}");
+    assert_eq!(wallet.pending().cloned(), kept);
+
+    let again = payment::pay(&mut wallet, h.client.verifier(), &request).unwrap();
+    assert_eq!(again.h_ctx, offer.h_ctx);
+    assert_eq!(again.sig_a, offer.sig_a);
+}
