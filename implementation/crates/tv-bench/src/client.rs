@@ -204,6 +204,7 @@ fn file_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
         v: 1,
         pk_b: public.pk_b,
         com_b_next: public.com_b_next,
+        memo: String::new(),
         attestation: s.attested.bundle.clone(),
     };
     let offer_file = OfferFile {

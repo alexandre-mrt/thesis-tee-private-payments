@@ -295,7 +295,7 @@ async fn run(cli: Cli) -> anyhow::Result<Option<String>> {
             wallet,
             amount,
             out,
-        } => Some(wallet.session()?.request(amount, &out).await?),
+        } => Some(wallet.session()?.request(amount, None, &out).await?),
         Command::Receive { wallet, offer, out } => {
             Some(wallet.session()?.receive(&offer, &out).await?)
         }

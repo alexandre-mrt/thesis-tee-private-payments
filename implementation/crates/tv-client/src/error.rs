@@ -214,6 +214,7 @@ mod tests {
             com_next: zero,
             channel_pk: zero,
             result_pk: zero,
+            memo: String::new(),
         };
         let pay = Pending::Pay {
             v: 1,

@@ -95,9 +95,14 @@ impl Session {
         ))
     }
 
-    pub async fn request(&self, amount: Option<u64>, out: &Path) -> Result<String, ClientError> {
+    pub async fn request(
+        &self,
+        amount: Option<u64>,
+        memo: Option<&str>,
+        out: &Path,
+    ) -> Result<String, ClientError> {
         let mut wallet = self.wallet()?;
-        let request = payment::request(&mut wallet, &self.bank, amount).await?;
+        let request = payment::request_with_memo(&mut wallet, &self.bank, amount, memo).await?;
         write_json(out, "request", &request)?;
         Ok(format!(
             "request for {} written to {} (payee serial {})",

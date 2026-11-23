@@ -30,7 +30,7 @@ async fn a_channel_key_from_a_request_file_serves_only_the_serial_it_was_atteste
     let request = payment::request(&mut bob, &h.client, Some(10))
         .await
         .unwrap();
-    let Some(Pending::Request { channel_pk, .. }) = bob.pending().copied() else {
+    let Some(Pending::Request { channel_pk, .. }) = bob.pending().cloned() else {
         panic!("bob has no pending request");
     };
     let entries = h.bank().entries().len();

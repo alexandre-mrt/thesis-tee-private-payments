@@ -80,6 +80,11 @@ enum Command {
     Request {
         #[arg(long, help = "Amount to receive")]
         amount: Option<u64>,
+        #[arg(
+            long,
+            help = "Context the payer signs, for example an invoice number (hashed, never sent to the bank)"
+        )]
+        memo: Option<String>,
         #[arg(long, help = "Where to write request.json")]
         out: PathBuf,
     },
@@ -190,7 +195,9 @@ async fn run(cli: Cli) -> anyhow::Result<String> {
         Command::Seed => seed_hex(&cli.wallet)?,
         Command::Balance => balance(&cli.wallet)?,
         Command::Enroll => session()?.enroll().await?,
-        Command::Request { amount, out } => session()?.request(amount, &out).await?,
+        Command::Request { amount, memo, out } => {
+            session()?.request(amount, memo.as_deref(), &out).await?
+        }
         Command::Pay {
             request,
             amount,

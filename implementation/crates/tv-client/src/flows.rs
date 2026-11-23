@@ -117,7 +117,7 @@ pub async fn refresh(
         finish(wallet, bank, None).await?;
         return Ok(Refreshed::FinishedSettledPayment);
     }
-    let abandoned = wallet.pending().copied();
+    let abandoned = wallet.pending().cloned();
     match move_to_next_serial(wallet, bank, signed.state.balance).await {
         Err(err @ ClientError::Behind { .. }) => {
             wallet.set_pending(abandoned)?;
@@ -212,7 +212,7 @@ pub async fn finish(
 ) -> Result<(), ClientError> {
     let pending = wallet
         .pending()
-        .copied()
+        .cloned()
         .ok_or(ClientError::NoPending { what: "operation" })?;
     let pk = wallet.current_pk()?;
     match pending {

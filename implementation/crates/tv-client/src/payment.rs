@@ -1,7 +1,7 @@
 use pt_tee::attestation::AttestationVerifier;
 use tv_core::{
-    B_MAX, BankRequest, BankResponse, Bytes32, PayPublic, PaySecret, Receive, Signature,
-    commitment, pay_digest, sign_digest,
+    B_MAX, BankRequest, BankResponse, Bytes32, CoreError, MAX_MEMO_LEN, PayPublic, PaySecret,
+    Receive, Signature, commitment, pay_digest, sign_digest,
 };
 
 use crate::attest::verify_bundle;
@@ -34,17 +34,53 @@ pub async fn request(
     bank: &BankClient,
     amount: Option<u64>,
 ) -> Result<RequestFile, ClientError> {
+    request_with_memo(wallet, bank, amount, None).await
+}
+
+fn requested(
+    wallet: &Wallet,
+    amount: Option<u64>,
+    memo: Option<&str>,
+) -> Result<(u64, Bytes32, String), ClientError> {
+    match (wallet.pending(), amount) {
+        (
+            Some(Pending::Request {
+                v,
+                com_next,
+                memo: kept,
+                ..
+            }),
+            a,
+        ) if a.is_none_or(|a| a == *v) && memo.is_none_or(|m| m == kept) => {
+            Ok((*v, *com_next, kept.clone()))
+        }
+        (Some(pending), _) => Err(ClientError::pending_blocks(pending)),
+        (None, None) => Err(ClientError::NoPending { what: "request" }),
+        (None, Some(v)) => {
+            let memo = memo.unwrap_or_default();
+            if memo.len() > MAX_MEMO_LEN {
+                return Err(CoreError::MemoTooLong {
+                    len: memo.len(),
+                    max: MAX_MEMO_LEN,
+                }
+                .into());
+            }
+            Ok((v, request_commitment(wallet, v)?, memo.to_owned()))
+        }
+    }
+}
+
+pub async fn request_with_memo(
+    wallet: &mut Wallet,
+    bank: &BankClient,
+    amount: Option<u64>,
+    memo: Option<&str>,
+) -> Result<RequestFile, ClientError> {
     wallet.signed_state()?;
     if wallet.on_enrolled_serial() {
         return Err(ClientError::EnrolledSerial);
     }
-    let (v, com_next) = match (wallet.pending().copied(), amount) {
-        (Some(Pending::Request { v, com_next, .. }), None) => (v, com_next),
-        (Some(Pending::Request { v, com_next, .. }), Some(a)) if a == v => (v, com_next),
-        (Some(pending), _) => return Err(ClientError::pending_blocks(&pending)),
-        (None, None) => return Err(ClientError::NoPending { what: "request" }),
-        (None, Some(v)) => (v, request_commitment(wallet, v)?),
-    };
+    let (v, com_next, memo) = requested(wallet, amount, memo)?;
     let pk_b = wallet.current_pk()?;
     let attested = bank.attest(&pk_b).await?;
     check_manifest(wallet, &attested)?;
@@ -53,17 +89,19 @@ pub async fn request(
         com_next,
         channel_pk: attested.channel_pk,
         result_pk: attested.bundle.manifest.result_pk,
+        memo: memo.clone(),
     }))?;
     Ok(RequestFile {
         v,
         pk_b,
         com_b_next: com_next,
+        memo,
         attestation: attested.bundle,
     })
 }
 
 fn payer_commitment(wallet: &Wallet, request: &RequestFile) -> Result<Bytes32, ClientError> {
-    match wallet.pending().copied() {
+    match wallet.pending().cloned() {
         Some(Pending::Pay {
             v,
             pk_b,
@@ -196,7 +234,8 @@ pub fn prepare_receive(wallet: &Wallet, offer: &OfferFile) -> Result<PreparedRec
         com_next,
         channel_pk,
         result_pk,
-    }) = wallet.pending().copied()
+        ..
+    }) = wallet.pending().cloned()
     else {
         return Err(ClientError::NoPending { what: "request" });
     };

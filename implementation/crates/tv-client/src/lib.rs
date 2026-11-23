@@ -20,7 +20,7 @@ pub use files::{
 pub use flows::{Refreshed, enroll, finish, refresh};
 pub use payment::{
     PreparedPay, PreparedReceive, Settlement, commit_pay, commit_receive, pay, prepare_pay,
-    prepare_receive, receive, request, submit_receive,
+    prepare_receive, receive, request, request_with_memo, submit_receive,
 };
 pub use recover::{Debits, recover, recover_from_genesis};
 pub use wallet::{Pending, Wallet, WalletData};

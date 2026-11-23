@@ -7,7 +7,10 @@ use tv_tests::{Harness, RESERVE, client_trust};
 async fn offer_from(h: &Harness, alice: &mut Wallet, session: &Session) -> std::path::PathBuf {
     let request_path = h.dir().join("request.json");
     let offer_path = h.dir().join("offer.json");
-    session.request(Some(10), &request_path).await.unwrap();
+    session
+        .request(Some(10), None, &request_path)
+        .await
+        .unwrap();
     let request: RequestFile = read_json(&request_path, "request").unwrap();
     let offer = payment::pay(alice, h.client.verifier(), &request).unwrap();
     write_json(&offer_path, "offer", &offer).unwrap();

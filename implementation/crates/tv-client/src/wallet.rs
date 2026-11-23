@@ -17,7 +17,7 @@ pub const WALLET_FILE_KIND: &str = "wallet";
 
 const WALLET_LOCK_KIND: &str = "wallet lock";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Pending {
     Enroll {
         com0: Bytes32,
@@ -28,6 +28,7 @@ pub enum Pending {
         com_next: Bytes32,
         channel_pk: Bytes32,
         result_pk: Bytes32,
+        memo: String,
     },
     Pay {
         v: u64,

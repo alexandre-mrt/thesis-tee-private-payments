@@ -35,7 +35,7 @@ async fn redeem(h: &Harness, session: &Session, wallet: &mut Wallet, v: u64) {
     let request_path = path(h, &format!("redeem-{v}.json"));
     let offer_path = path(h, &format!("redeem-offer-{v}.json"));
     let receipt_path = path(h, &format!("redeem-receipt-{v}.json"));
-    session.request(Some(v), &request_path).await.unwrap();
+    session.request(Some(v), None, &request_path).await.unwrap();
     let request: RequestFile = read_json(&request_path, "request").unwrap();
     let offer = payment::pay(wallet, h.client.verifier(), &request).unwrap();
     write_json(&offer_path, "offer", &offer).unwrap();

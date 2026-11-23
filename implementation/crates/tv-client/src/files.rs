@@ -16,6 +16,7 @@ pub struct RequestFile {
     pub v: u64,
     pub pk_b: Bytes32,
     pub com_b_next: Bytes32,
+    pub memo: String,
     pub attestation: AttestationBundle,
 }
 
