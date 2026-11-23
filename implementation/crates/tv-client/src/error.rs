@@ -116,6 +116,12 @@ pub enum ClientError {
     Clock,
     #[error("recovery failed: {0}")]
     Recover(String),
+    #[error("log entry {seq} does not verify against the bank's receipt key or chain")]
+    BadLog { seq: u64 },
+    #[error(
+        "the log served now does not hold the chain head this wallet saw at entry {seq}: the bank forked its log"
+    )]
+    ChainMismatch { seq: u64 },
     #[error("the bank's receipt does not verify: {what}")]
     BadReceipt { what: &'static str },
     #[error("the offer's {what} does not match this request; nothing was signed")]
@@ -226,6 +232,7 @@ mod tests {
             com_b_next: zero,
             com_a_next: zero,
             digest: zero,
+            memo: String::new(),
         };
         let refresh = Pending::Refresh {
             com_next: zero,

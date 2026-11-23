@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tv_core::{
-    BankKeys, Bytes32, Opening, Seed, SideKind, Signature, SignedState, SigningKey, State,
-    derive_r, derive_sk, verify_state,
+    BankKeys, Bytes32, LogEntry, Opening, Seed, SideKind, Signature, SignedState, SigningKey,
+    State, derive_r, derive_sk, verify_state,
 };
 
 use crate::error::ClientError;
@@ -36,6 +36,7 @@ pub enum Pending {
         com_b_next: Bytes32,
         com_a_next: Bytes32,
         digest: Bytes32,
+        memo: String,
     },
     Refresh {
         com_next: Bytes32,
@@ -55,6 +56,18 @@ impl Pending {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoRecord {
+    pub digest: Bytes32,
+    pub memo: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChainHead {
+    pub seq: u64,
+    pub chain: Bytes32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WalletData {
     pub seed: Seed,
     pub bank: BankKeys,
@@ -62,6 +75,8 @@ pub struct WalletData {
     pub index: u64,
     pub state: Option<SignedState>,
     pub pending: Option<Pending>,
+    pub memos: Vec<MemoRecord>,
+    pub head: Option<ChainHead>,
 }
 
 impl WalletData {
@@ -115,6 +130,8 @@ impl Wallet {
             index: 0,
             state: None,
             pending: None,
+            memos: Vec::new(),
+            head: None,
         };
         Self::create_with(path, data)
     }
@@ -168,6 +185,37 @@ impl Wallet {
 
     pub fn receipt_pk(&self) -> Bytes32 {
         self.data.receipt_pk
+    }
+
+    pub fn head(&self) -> Option<ChainHead> {
+        self.data.head
+    }
+
+    pub fn memo_for(&self, digest: &Bytes32) -> Option<&str> {
+        self.data
+            .memos
+            .iter()
+            .find(|record| record.digest == *digest)
+            .map(|record| record.memo.as_str())
+    }
+
+    pub fn remember(&mut self, entry: &LogEntry, memo: &str) {
+        if !memo.is_empty() && self.memo_for(&entry.digest).is_none() {
+            self.data.memos.push(MemoRecord {
+                digest: entry.digest,
+                memo: memo.to_owned(),
+            });
+        }
+        self.see_head(ChainHead {
+            seq: entry.seq,
+            chain: entry.chain,
+        });
+    }
+
+    pub fn see_head(&mut self, head: ChainHead) {
+        if self.data.head.is_none_or(|known| known.seq < head.seq) {
+            self.data.head = Some(head);
+        }
     }
 
     pub fn index(&self) -> u64 {

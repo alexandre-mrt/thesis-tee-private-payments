@@ -18,9 +18,12 @@ pub fn check_manifest(wallet: &Wallet, attested: &Attested) -> Result<(), Client
     Ok(())
 }
 
-fn settled_single(wallet: &Wallet, op: &Single, receipt: &Receipt) -> Result<(), ClientError> {
+fn settled_single(wallet: &mut Wallet, op: &Single, receipt: &Receipt) -> Result<(), ClientError> {
     wallet.verify_new_state(&op.com, &op.sig)?;
-    check_entry(wallet, &single_entry(op, receipt))
+    let entry = single_entry(op, receipt);
+    check_entry(wallet, &entry)?;
+    wallet.remember(&entry, "");
+    Ok(())
 }
 
 pub async fn enroll(wallet: &mut Wallet, bank: &BankClient) -> Result<(), ClientError> {
@@ -189,18 +192,19 @@ async fn refusal_of(bank: &BankClient, serial: &Bytes32) -> ClientError {
 
 fn entry_sig(wallet: &Wallet, entry: &LogEntry, com: &Bytes32) -> Result<Signature, ClientError> {
     check_entry(wallet, entry)?;
-    entry
+    let sig = entry
         .sig_for(com)
-        .ok_or(ClientError::Mismatch { what: "log entry" })
+        .ok_or(ClientError::Mismatch { what: "log entry" })?;
+    wallet.verify_new_state(com, &sig)?;
+    Ok(sig)
 }
 
-async fn lookup_sig(
+async fn lookup_entry(
     wallet: &Wallet,
     bank: &BankClient,
     kind: OpKind,
     digest: &Bytes32,
-    com: &Bytes32,
-) -> Result<Signature, ClientError> {
+) -> Result<LogEntry, ClientError> {
     let serial = &wallet.current_pk()?;
     let next = match kind {
         OpKind::Pay => PAY_NOT_SETTLED,
@@ -217,7 +221,40 @@ async fn lookup_sig(
             serial: hex::encode(serial),
         });
     }
-    entry_sig(wallet, &entry, com)
+    Ok(entry)
+}
+
+struct PendingPay {
+    v: u64,
+    com_a_next: Bytes32,
+    digest: Bytes32,
+    memo: String,
+}
+
+async fn finish_pay(
+    wallet: &mut Wallet,
+    bank: &BankClient,
+    receipt: Option<&ReceiptFile>,
+    pay: PendingPay,
+) -> Result<(), ClientError> {
+    let pk = wallet.current_pk()?;
+    let entry = match receipt {
+        Some(r) if r.entry.digest == pay.digest && r.entry.serials.first() == Some(&pk) => {
+            r.entry.clone()
+        }
+        Some(_) => return Err(ClientError::Mismatch { what: "receipt" }),
+        None => lookup_entry(wallet, bank, OpKind::Pay, &pay.digest).await?,
+    };
+    let sig = entry_sig(wallet, &entry, &pay.com_a_next)?;
+    let balance = wallet
+        .balance()
+        .checked_sub(pay.v)
+        .ok_or(ClientError::Insufficient {
+            balance: wallet.balance(),
+            amount: pay.v,
+        })?;
+    wallet.remember(&entry, &pay.memo);
+    wallet.advance(balance, sig)
 }
 
 pub async fn finish(
@@ -229,40 +266,33 @@ pub async fn finish(
         .pending()
         .cloned()
         .ok_or(ClientError::NoPending { what: "operation" })?;
-    let pk = wallet.current_pk()?;
     match pending {
         Pending::Pay {
             v,
             com_a_next,
             digest,
+            memo,
             ..
         } => {
-            let sig = match receipt {
-                Some(r) if r.entry.digest == digest && r.entry.serials.first() == Some(&pk) => {
-                    entry_sig(wallet, &r.entry, &com_a_next)?
-                }
-                Some(_) => return Err(ClientError::Mismatch { what: "receipt" }),
-                None => lookup_sig(wallet, bank, OpKind::Pay, &digest, &com_a_next).await?,
+            let pay = PendingPay {
+                v,
+                com_a_next,
+                digest,
+                memo,
             };
-            wallet.verify_new_state(&com_a_next, &sig)?;
-            let balance = wallet
-                .balance()
-                .checked_sub(v)
-                .ok_or(ClientError::Insufficient {
-                    balance: wallet.balance(),
-                    amount: v,
-                })?;
-            wallet.advance(balance, sig)
+            finish_pay(wallet, bank, receipt, pay).await
         }
         Pending::Refresh { com_next, digest } => {
-            let sig = lookup_sig(wallet, bank, OpKind::Refresh, &digest, &com_next).await?;
-            wallet.verify_new_state(&com_next, &sig)?;
+            let entry = lookup_entry(wallet, bank, OpKind::Refresh, &digest).await?;
+            let sig = entry_sig(wallet, &entry, &com_next)?;
+            wallet.remember(&entry, "");
             wallet.advance(wallet.balance(), sig)
         }
         Pending::Enroll { com0, digest } => {
-            let sig = lookup_sig(wallet, bank, OpKind::Enroll, &digest, &com0).await?;
-            wallet.verify_new_state(&com0, &sig)?;
-            let r = wallet.r_at(wallet.index())?;
+            let entry = lookup_entry(wallet, bank, OpKind::Enroll, &digest).await?;
+            let sig = entry_sig(wallet, &entry, &com0)?;
+            let (pk, r) = (wallet.current_pk()?, wallet.r_at(wallet.index())?);
+            wallet.remember(&entry, "");
             wallet.set_enrolled(State { balance: 0, pk, r }, sig)
         }
         Pending::Request { .. } => Err(ClientError::NoPending {

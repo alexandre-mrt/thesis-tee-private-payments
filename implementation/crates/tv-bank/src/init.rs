@@ -77,6 +77,8 @@ fn populate(dir: &Path, reserve: u64) -> Result<BankKeys, BankError> {
             index: 0,
             state: Some(SignedState { state, sig }),
             pending: None,
+            memos: Vec::new(),
+            head: None,
         },
     )?;
     create_log(dir, &receipt_key.public_key())?;

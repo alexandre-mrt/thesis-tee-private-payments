@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
-use tv_core::{B_MAX, Bytes32, LogEntry, OpKind, SignedState, State, commitment};
+use tv_core::{
+    B_MAX, Bytes32, LogEntry, OpKind, SignedState, State, VerifyingKey, chain_genesis, commitment,
+};
 
 use crate::bank::BankClient;
 use crate::error::ClientError;
-use crate::wallet::Wallet;
+use crate::wallet::{ChainHead, Wallet};
 
 pub type Debits = BTreeMap<Bytes32, u64>;
 
@@ -116,11 +118,53 @@ fn walk(
     Ok((index, state))
 }
 
-pub async fn recover(wallet: &mut Wallet, bank: &BankClient) -> Result<u64, ClientError> {
-    let log = bank.full_log().await?;
-    let (index, state) = walk(wallet, &log, None, &Debits::new())?;
+pub fn verify_chain(wallet: &Wallet, log: &[LogEntry]) -> Result<Option<ChainHead>, ClientError> {
+    let key = VerifyingKey::parse(&wallet.receipt_pk())?;
+    let mut prev = chain_genesis(&wallet.receipt_pk());
+    for (position, entry) in (0u64..).zip(log) {
+        let seq = entry.seq;
+        if seq != position {
+            return Err(ClientError::BadLog { seq });
+        }
+        entry
+            .verify_link(&prev)
+            .and_then(|()| entry.verify_receipt(&key))
+            .map_err(|_| ClientError::BadLog { seq })?;
+        prev = entry.chain;
+    }
+    if let Some(known) = wallet.head() {
+        let served = usize::try_from(known.seq)
+            .ok()
+            .and_then(|i| log.get(i))
+            .map(|entry| entry.chain);
+        if served != Some(known.chain) {
+            return Err(ClientError::ChainMismatch { seq: known.seq });
+        }
+    }
+    Ok(log.last().map(|entry| ChainHead {
+        seq: entry.seq,
+        chain: entry.chain,
+    }))
+}
+
+fn restore_verified(
+    wallet: &mut Wallet,
+    log: &[LogEntry],
+    genesis: Option<SignedState>,
+    debits: &Debits,
+) -> Result<u64, ClientError> {
+    let head = verify_chain(wallet, log)?;
+    let (index, state) = walk(wallet, log, genesis, debits)?;
+    if let Some(head) = head {
+        wallet.see_head(head);
+    }
     wallet.restore(index, state)?;
     Ok(index)
+}
+
+pub async fn recover(wallet: &mut Wallet, bank: &BankClient) -> Result<u64, ClientError> {
+    let log = bank.full_log().await?;
+    restore_verified(wallet, &log, None, &Debits::new())
 }
 
 fn check_genesis(wallet: &Wallet, genesis: &SignedState) -> Result<(), ClientError> {
@@ -141,9 +185,7 @@ pub async fn recover_from_genesis(
 ) -> Result<u64, ClientError> {
     check_genesis(wallet, &genesis)?;
     let log = bank.full_log().await?;
-    let (index, state) = walk(wallet, &log, Some(genesis), debits)?;
-    wallet.restore(index, state)?;
-    Ok(index)
+    restore_verified(wallet, &log, Some(genesis), debits)
 }
 
 #[cfg(test)]

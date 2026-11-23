@@ -204,6 +204,7 @@ pub fn prepare_pay(
             com_b_next: request.com_b_next,
             com_a_next,
             digest,
+            memo: request.memo.clone(),
         },
     })
 }
@@ -350,6 +351,7 @@ pub async fn submit_receive(
 
 pub fn commit_receive(wallet: &mut Wallet, settled: &Settlement) -> Result<(), ClientError> {
     wallet.verify_new_state(&settled.com_b_next, &settled.sig_b_next)?;
+    wallet.remember(&settled.receipt.entry, &settled.receipt.memo);
     wallet.advance(settled.balance_next, settled.sig_b_next)
 }
 

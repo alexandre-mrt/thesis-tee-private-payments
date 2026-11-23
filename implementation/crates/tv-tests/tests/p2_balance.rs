@@ -85,6 +85,8 @@ async fn the_balance_cap_binds_users_but_not_the_bank() {
             index: 0,
             state: None,
             pending: None,
+            memos: Vec::new(),
+            head: None,
         },
     )
     .unwrap();
