@@ -244,3 +244,59 @@ The enclave checks match the earlier rounds (0.188 against 0.193 to 0.194 ms). T
 | zeroizing allocator, scrub (the shipped binary) | 0.195 ms | 0.194 ms | 0.195 ms |
 
 The zeroizing allocator costs about 0.005 ms per check (2.6 percent), consistent in all three runs. The stack scrub costs at most 0.001 ms, inside the run-to-run noise. With 11 threads all four builds read between 29022 and 31584 /s, with no order among them. The bench keeps the system allocator so the enclave rows stay comparable with the earlier rounds; add 0.005 ms to them for the shipped binary.
+
+## Evidence layer (branch feat/non-repudiation, 2026-11-23)
+
+This round added owner-anchored evidence (`docs/DESIGN.md`, Evidence): the pay digest binds `C_v` and `h_ctx`, every log entry carries the owner signatures, an epoch, a chain head and a receipt signed by the bank's receipt key under the store lock, wallets derive a pair secret and verify receipts, and `tv-cli` proves and verifies payments. `main` (`b594079`) and the branch were built from the same toolchain and run interleaved in one session (main, branch, main, branch, 10 s apart), each with `--payments 1000` and the other defaults, load average 4 to 6 (other desktop processes running). Each cell gives the mean of the two runs; deltas are branch against main.
+
+| Measurement | main | branch | delta |
+|---|---|---|---|
+| enclave checks, 1 thread | 0.192 ms | 0.192 ms | +0.3 % |
+| enclave checks, 11 threads | 28859 /s | 30422 /s | +5.4 % (noise) |
+| store append, fsync per op | 2.638 ms | 2.669 ms | +1.2 % |
+| store stage + group commit, 1 writer | 2.614 ms | 2.699 ms | +3.3 % |
+| store stage + group commit, 11 writers | 2226 /s | 2013 /s | -9.6 % |
+| store stage + group commit, 64 writers | 11346 /s (0.088 ms) | 9810 /s (0.102 ms) | -13.5 % |
+| bank settle, 1 pair | 3.890 ms | 4.262 ms (4.083, 4.440) | +9.6 % |
+| bank settle, 11 pairs | 1829 /s | 1859 /s | +1.6 % |
+| bank settle, 44 pairs | 6169 /s | 6275 /s | +1.7 % |
+| attest round trip p50 / p95 / p99 | 0.378 / 0.502 / 0.583 ms | 0.378 / 0.499 / 0.573 ms | 0 % |
+| build offer and payee blob p50 | 0.328 ms | 0.378 ms | +15 % |
+| receive round trip p50 / p95 / p99 | 3.728 / 4.503 / 5.038 ms | 3.872 / 4.840 / 5.878 ms | +3.9 / +7.5 / +16.7 % |
+| payment total p50 / p95 / p99 | 4.355 / 5.262 / 5.944 ms | 4.752 / 5.920 / 7.055 ms | +9.1 / +12.5 / +18.7 % |
+| tv-cli flow with wallet files p50 | 29.49 ms | 30.73 ms | +4.2 % |
+| `prepare_pay` mean / p99 | 0.183 / 0.321 ms | 0.173 / 0.397 ms | -5 / +24 % |
+
+The changed path is the store lock: sealing an entry (entry hash, chain step, one Ed25519 signature) costs 0.011 ms and runs serialized under the lock, which shows where the lock is the bottleneck, at 64 group-commit writers (+0.014 ms per entry, consistent with the sealing cost) and less clearly at 11. Where the fsync dominates (1 writer, append per op, settle with 11 and 44 pairs) the difference is within the run-to-run variation recorded in earlier rounds. The loopback latency tails moved more than the sealing explains: branch run 1 had a receive p99 of 6.757 ms against 4.998 ms in branch run 2, and the payment total p50 of main moved from 4.075 to 4.635 ms between its two runs, so the p95 and p99 deltas are not separated from the load of this session. The 1-pair settle includes the client work of each pair, which now derives the pair secret twice (payer and payee, 0.033 ms each).
+
+New per-operation costs (mean of 20,000 iterations in process, two runs):
+
+| Operation | run 1 | run 2 |
+|---|---|---|
+| pair secret (X25519 + HKDF) + `C_v` + `h_ctx`, per party | 0.033 ms | 0.032 ms |
+| seal an entry (entry hash, chain step, receipt signature), per settlement under the store lock | 0.011 ms | 0.010 ms |
+| verify a receipt and its chain link | 0.029 ms | 0.028 ms |
+| verify the owner signatures of a Pay entry (B2 replay) | 0.062 ms | 0.059 ms |
+| sign a presentation (prover) | 0.010 ms | 0.010 ms |
+| `verify_proof`, payer mode (V1 to V7) | 0.175 ms | 0.172 ms |
+| `verify_proof`, designated mode | 0.177 ms | 0.174 ms |
+| startup replay per entry (parse, trailer hash, chain link, receipt verify; 1000-entry log) | 0.067 ms | 0.063 ms |
+| prove-payment over a 5-entry log (chain check, walk, proof), p50 / p99 | 0.314 / 0.839 ms | 0.313 / 0.852 ms |
+| verify-proof from a wallet (key parsing included), p50 / p99 | 0.214 / 0.570 ms | 0.213 / 0.577 ms |
+
+Startup replay now verifies one receipt per entry: about 0.065 ms per entry in total, about 65 s per million entries single-threaded (derived). `prove-payment` verifies the whole downloaded log, so it grows by about 0.03 ms per log entry (derived from the receipt check) plus the recovery walk.
+
+Message sizes (bytes, mean of the two runs of each tree; `[u8; 32]` fields still vary by a few bytes per run, see above):
+
+| Message | main | branch | delta |
+|---|---|---|---|
+| wire user to bank `Receive` | 4898 | 5035 | +137 (+2.8 %) |
+| wire bank to user `Settled` | 168 | 332 | +164 (+98 %) |
+| wire bank to enclave `Check(Pay)` | 4979 | 5116 | +137 (+2.7 %) |
+| wire enclave to bank `Result` | 242 | 244 | unchanged format |
+| `log.jsonl` line, Pay | 1106 | 2220 | +1114 (+101 %) |
+| file `request.json` (empty memo) | 5190 | 5198 | +8 |
+| file `offer.json` | 24420 | 25003 | +583 (+2.4 %) |
+| file `receipt.json` | 1453 | 7280 | +5827 (+401 %) |
+
+The design note estimated +64 raw bytes for `Receive`, +112 for `Settled` and about +1.1 KB for a log line; the measured CBOR and JSON deltas are larger because every 32-byte array costs 33 to 65 bytes as an integer array. `receipt.json` is now the whole log entry written by `to_vec_pretty`, one array element per line; the byte-string encoding left for a format revision would shrink it most. The log line and `receipt.json` sizes now come from the bank's stored entry (the earlier rounds built the line by hand).
