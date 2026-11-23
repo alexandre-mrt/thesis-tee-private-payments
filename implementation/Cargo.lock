@@ -2076,6 +2076,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hex",
+ "proptest",
  "pt-tee",
  "serde",
  "serde_json",

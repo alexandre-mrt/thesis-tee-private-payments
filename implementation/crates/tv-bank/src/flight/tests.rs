@@ -1,4 +1,4 @@
-use tv_core::{OpKind, chain_genesis};
+use tv_core::{OpKind, SigningKey, chain_genesis};
 
 use super::*;
 use crate::journal::LOG_FILE;
@@ -230,4 +230,47 @@ fn a_log_without_its_whole_header_is_refused_and_never_truncated() {
         assert_eq!(std::fs::read(&path).unwrap(), damaged);
         std::fs::remove_dir_all(dir).unwrap();
     }
+}
+
+#[test]
+fn a_log_from_another_receipt_key_or_version_is_refused() {
+    let other = header(&[7u8; 32]);
+    assert!(matches!(
+        replay(&other),
+        Err(BankError::Core(_)) | Err(BankError::Corrupt { .. })
+    ));
+    let legacy = b"{\"log\":\"flights\"}\n".to_vec();
+    assert!(matches!(
+        replay(&legacy),
+        Err(BankError::Corrupt { line: 0, .. })
+    ));
+    let foreign = SigningKey::from_bytes(&[9u8; 32]).public_key();
+    let dir = temp_dir("foreign-key");
+    write_test_key(&dir);
+    std::fs::write(dir.join(LOG_FILE), header(&foreign)).unwrap();
+    assert!(matches!(
+        Store::open(&dir),
+        Err(BankError::ReceiptKeyMismatch)
+    ));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn a_resealed_or_reordered_entry_breaks_the_chain() {
+    let good = single_flights(2);
+    let mut forged = sealed(2, 1);
+    forged.rcpt = tv_core::Signature([1u8; 64]);
+    let mut bad_rcpt = serde_json::to_vec(&forged).unwrap();
+    bad_rcpt.push(b'\n');
+    assert!(matches!(
+        replay(&[good.clone(), flight(&[bad_rcpt])].concat()),
+        Err(BankError::Corrupt { .. })
+    ));
+    let off_chain = sealed(2, 1).sealed(&[0u8; 32], &receipt_key());
+    let mut line_off = serde_json::to_vec(&off_chain).unwrap();
+    line_off.push(b'\n');
+    assert!(matches!(
+        replay(&[good, flight(&[line_off])].concat()),
+        Err(BankError::Corrupt { .. })
+    ));
 }
