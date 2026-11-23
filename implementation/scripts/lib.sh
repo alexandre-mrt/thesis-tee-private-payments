@@ -120,11 +120,13 @@ setup() {
   keys="$("${BIN}/tv-bank" init --data "${BANK_DATA}")"
   STATE_PK="$(sed -n 's/^state_pk=//p' <<<"${keys}")"
   ISSUANCE_PK="$(sed -n 's/^issuance_pk=//p' <<<"${keys}")"
+  RECEIPT_PK="$(sed -n 's/^receipt_pk=//p' <<<"${keys}")"
   echo "bank state key:    ${STATE_PK}"
   echo "bank issuance key: ${ISSUANCE_PK}"
+  echo "bank receipt key:  ${RECEIPT_PK}"
   mkdir -p "${WALLETS}"
   for name in alice bob; do
-    cli "${name}" new --state-pk "${STATE_PK}" --issuance-pk "${ISSUANCE_PK}"
+    cli "${name}" new --state-pk "${STATE_PK}" --issuance-pk "${ISSUANCE_PK}" --receipt-pk "${RECEIPT_PK}"
   done
 }
 

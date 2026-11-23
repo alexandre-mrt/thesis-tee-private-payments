@@ -88,15 +88,18 @@ pub async fn transfer(
 
 pub async fn funded_wallets(lb: &Loopback, tag: &str, balance: u64) -> Result<(Wallet, Wallet)> {
     let client = &lb.client;
+    let receipt_pk = tv_bank::read_receipt_pk(&lb.dir)?;
     let mut alice = Wallet::create(
         &lb.dir.join(format!("{tag}-alice.json")),
         Seed::generate(),
         lb.keys,
+        receipt_pk,
     )?;
     let mut bob = Wallet::create(
         &lb.dir.join(format!("{tag}-bob.json")),
         Seed::generate(),
         lb.keys,
+        receipt_pk,
     )?;
     flows::enroll_and_refresh(&mut alice, client).await?;
     flows::enroll_and_refresh(&mut bob, client).await?;

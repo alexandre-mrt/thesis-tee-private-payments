@@ -69,6 +69,12 @@ enum Command {
             help = "Bank issuance public key (tv-bank init, line 2)"
         )]
         issuance_pk: String,
+        #[arg(
+            long,
+            value_name = "HEX",
+            help = "Bank receipt public key (tv-bank init, line 3)"
+        )]
+        receipt_pk: String,
     },
     #[command(about = "Print the wallet seed (hex)")]
     Seed,
@@ -184,13 +190,15 @@ async fn run(cli: Cli) -> anyhow::Result<String> {
             seed,
             state_pk,
             issuance_pk,
+            receipt_pk,
         } => {
             let seed = seed.as_deref().map(Seed::from_hex).transpose()?;
             let bank = BankKeys {
                 state_pk: parse_pk(&state_pk, "--state-pk")?,
                 issuance_pk: parse_pk(&issuance_pk, "--issuance-pk")?,
             };
-            create_wallet(&cli.wallet, seed, bank)?
+            let receipt_pk = parse_pk(&receipt_pk, "--receipt-pk")?;
+            create_wallet(&cli.wallet, seed, bank, receipt_pk)?
         }
         Command::Seed => seed_hex(&cli.wallet)?,
         Command::Balance => balance(&cli.wallet)?,

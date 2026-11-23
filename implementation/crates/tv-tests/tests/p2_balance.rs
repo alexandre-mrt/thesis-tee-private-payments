@@ -81,6 +81,7 @@ async fn the_balance_cap_binds_users_but_not_the_bank() {
         tv_client::WalletData {
             seed: bob.seed(),
             bank: h.keys,
+            receipt_pk: h.receipt_pk,
             index: 0,
             state: None,
             pending: None,

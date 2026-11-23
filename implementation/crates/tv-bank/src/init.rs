@@ -73,6 +73,7 @@ fn populate(dir: &Path, reserve: u64) -> Result<BankKeys, BankError> {
         WalletData {
             seed,
             bank: keys,
+            receipt_pk: receipt_key.public_key(),
             index: 0,
             state: Some(SignedState { state, sig }),
             pending: None,

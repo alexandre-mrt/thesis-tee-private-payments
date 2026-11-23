@@ -39,6 +39,7 @@ pub struct Forge {
 pub struct Harness {
     dir: PathBuf,
     pub keys: BankKeys,
+    pub receipt_pk: Bytes32,
     pub link: TestLink,
     bank: Option<Arc<Bank<TestLink>>>,
     pub client: BankClient,
@@ -87,6 +88,7 @@ impl Harness {
     pub async fn new() -> Self {
         let dir = temp_dir();
         let keys = tv_bank::init(&dir, RESERVE).expect("init");
+        let receipt_pk = tv_bank::read_receipt_pk(&dir).expect("receipt key");
         let result_key = SigningKey::generate();
         let enclave =
             Enclave::boot_with_result_key(keys, Box::new(MockProvider::new()), result_key.clone())
@@ -104,6 +106,7 @@ impl Harness {
         Self {
             dir,
             keys,
+            receipt_pk,
             link,
             bank: Some(bank),
             client,
@@ -155,12 +158,19 @@ impl Harness {
             &self.dir.join(format!("{name}.json")),
             Seed::generate(),
             self.keys,
+            self.receipt_pk,
         )
         .expect("wallet")
     }
 
     pub fn wallet_from_seed(&self, name: &str, seed: Seed) -> Wallet {
-        Wallet::create(&self.dir.join(format!("{name}.json")), seed, self.keys).expect("wallet")
+        Wallet::create(
+            &self.dir.join(format!("{name}.json")),
+            seed,
+            self.keys,
+            self.receipt_pk,
+        )
+        .expect("wallet")
     }
 
     pub fn bank_wallet(&self) -> Wallet {

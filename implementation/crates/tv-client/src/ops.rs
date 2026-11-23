@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use pt_tee::transport::Endpoint;
-use tv_core::{BankKeys, Seed, SignedState};
+use tv_core::{BankKeys, Bytes32, Seed, SignedState};
 
 use crate::attest::Trust;
 use crate::bank::BankClient;
@@ -20,8 +20,9 @@ pub fn create_wallet(
     path: &Path,
     seed: Option<Seed>,
     bank: BankKeys,
+    receipt_pk: Bytes32,
 ) -> Result<String, ClientError> {
-    let wallet = Wallet::create(path, seed.unwrap_or_else(Seed::generate), bank)?;
+    let wallet = Wallet::create(path, seed.unwrap_or_else(Seed::generate), bank, receipt_pk)?;
     Ok(format!(
         "wallet {} created, pk_0={}",
         path.display(),

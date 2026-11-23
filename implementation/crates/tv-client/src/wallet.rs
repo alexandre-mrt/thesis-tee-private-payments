@@ -58,6 +58,7 @@ impl Pending {
 pub struct WalletData {
     pub seed: Seed,
     pub bank: BankKeys,
+    pub receipt_pk: Bytes32,
     pub index: u64,
     pub state: Option<SignedState>,
     pub pending: Option<Pending>,
@@ -101,10 +102,16 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn create(path: &Path, seed: Seed, bank: BankKeys) -> Result<Self, ClientError> {
+    pub fn create(
+        path: &Path,
+        seed: Seed,
+        bank: BankKeys,
+        receipt_pk: Bytes32,
+    ) -> Result<Self, ClientError> {
         let data = WalletData {
             seed,
             bank,
+            receipt_pk,
             index: 0,
             state: None,
             pending: None,
@@ -157,6 +164,10 @@ impl Wallet {
 
     pub fn bank(&self) -> BankKeys {
         self.data.bank
+    }
+
+    pub fn receipt_pk(&self) -> Bytes32 {
+        self.data.receipt_pk
     }
 
     pub fn index(&self) -> u64 {

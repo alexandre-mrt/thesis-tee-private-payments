@@ -19,7 +19,7 @@ fn bank() -> BankKeys {
 fn create_load_advance_and_locking() {
     let path = temp_path("basic");
     let seed = Seed::generate();
-    let mut wallet = Wallet::create(&path, seed, bank()).unwrap();
+    let mut wallet = Wallet::create(&path, seed, bank(), [3u8; 32]).unwrap();
     assert!(matches!(
         Wallet::load(&path),
         Err(ClientError::WalletLocked { .. })
@@ -48,7 +48,7 @@ fn create_load_advance_and_locking() {
     let data = wallet.data().clone();
     drop(wallet);
     assert!(matches!(
-        Wallet::create(&path, seed, bank()),
+        Wallet::create(&path, seed, bank(), [3u8; 32]),
         Err(ClientError::File { what: "wallet", .. })
     ));
     let loaded = Wallet::load(&path).unwrap();
@@ -67,7 +67,7 @@ fn create_load_advance_and_locking() {
 #[test]
 fn a_failed_save_names_the_wallet_file() {
     let path = temp_path("save");
-    let mut wallet = Wallet::create(&path, Seed::generate(), bank()).unwrap();
+    let mut wallet = Wallet::create(&path, Seed::generate(), bank(), [3u8; 32]).unwrap();
     std::fs::remove_file(&path).unwrap();
     std::fs::create_dir(&path).unwrap();
     let err = wallet.set_pending(None).unwrap_err();

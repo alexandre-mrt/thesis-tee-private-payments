@@ -31,7 +31,7 @@ cli bob finish --receipt "${DATA}/receipt-redeem.json"
 
 echo "== recover alice from her seed alone"
 SEED="$(cli alice seed)"
-cli alice-recovered new --seed "${SEED}" --state-pk "${STATE_PK}" --issuance-pk "${ISSUANCE_PK}"
+cli alice-recovered new --seed "${SEED}" --state-pk "${STATE_PK}" --issuance-pk "${ISSUANCE_PK}" --receipt-pk "${RECEIPT_PK}"
 cli alice-recovered recover
 echo "recovered: $(cli alice-recovered balance)"
 
