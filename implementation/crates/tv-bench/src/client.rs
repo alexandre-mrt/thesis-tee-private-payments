@@ -215,6 +215,8 @@ fn file_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
         payer: s.payment.receive.payer.clone(),
         pk_b: public.pk_b,
         com_b_next: public.com_b_next,
+        c_v: public.c_v,
+        h_ctx: public.h_ctx,
     };
     let receipt_file = ReceiptFile {
         digest: public.digest(),

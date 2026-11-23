@@ -2,9 +2,9 @@ use anyhow::{Context, Result, bail};
 use pt_tee::channel::PK_LEN;
 use tv_client::{WalletData, seal_to};
 use tv_core::{
-    BankResponse, Bytes32, EnrollRequest, EnrollSecret, Opening, PayPublic, PaySecret, Receive,
-    Seed, SideKind, Signature, SignedState, SigningKey, State, commitment, derive_r, derive_sk,
-    enroll_digest, pay_digest, sign_digest, sign_state, verify_state,
+    BankResponse, Bytes32, EnrollRequest, EnrollSecret, Opening, PairSecret, PayPublic, PaySecret,
+    Receive, Seed, SideKind, Signature, SignedState, SigningKey, State, commitment, derive_r,
+    derive_sk, enroll_digest, sign_digest, sign_state, verify_state,
 };
 
 pub struct Party {
@@ -145,16 +145,30 @@ pub fn payment(payer: &Party, payee: &Party, v: u64, channel_pk: &[u8; PK_LEN]) 
     let com_b_next = commitment(b_next, &payee_opening.next_pk, &payee_opening.next_r);
     let pk_a = payer.pk()?;
     let pk_b = payee.pk()?;
-    let digest = pay_digest(&pk_a, &com_a_next, &pk_b, &com_b_next);
+    let (payer_key, payee_key) = (payer.key()?, payee.key()?);
+    let pair = PairSecret::derive(&payer_key, &pk_a, &pk_b)?;
+    let unsigned = PayPublic {
+        pk_a,
+        com_a_next,
+        sig_a: Signature([0u8; 64]),
+        pk_b,
+        com_b_next,
+        sig_b: Signature([0u8; 64]),
+        c_v: pair.amount_commitment(v)?,
+        h_ctx: pair.context_hash(b"")?,
+    };
+    let checked = PairSecret::derive(&payee_key, &pk_a, &pk_b)?;
+    if checked.amount_commitment(v)? != unsigned.c_v || checked.context_hash(b"")? != unsigned.h_ctx
+    {
+        bail!("the payee's pair secret disagrees with the payer's");
+    }
+    let digest = unsigned.digest();
     let receive = Receive {
         channel_pk: *channel_pk,
         public: PayPublic {
-            pk_a,
-            com_a_next,
-            sig_a: sign_digest(&payer.key()?, &digest),
-            pk_b,
-            com_b_next,
-            sig_b: sign_digest(&payee.key()?, &digest),
+            sig_a: sign_digest(&payer_key, &digest),
+            sig_b: sign_digest(&payee_key, &digest),
+            ..unsigned
         },
         payer: seal_to(
             channel_pk,

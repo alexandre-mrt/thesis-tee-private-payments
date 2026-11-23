@@ -1,7 +1,7 @@
 use pt_tee::attestation::AttestationVerifier;
 use tv_core::{
-    B_MAX, BankRequest, BankResponse, Bytes32, CoreError, MAX_MEMO_LEN, PayPublic, PaySecret,
-    Receive, Signature, commitment, pay_digest, sign_digest,
+    B_MAX, BankRequest, BankResponse, Bytes32, CoreError, MAX_MEMO_LEN, PairSecret, PayFields,
+    PayPublic, PaySecret, Receive, Signature, SigningKey, commitment, pay_digest, sign_digest,
 };
 
 use crate::attest::verify_bundle;
@@ -166,7 +166,17 @@ pub fn prepare_pay(
     if pk_a == request.pk_b {
         return Err(ClientError::SelfPayment);
     }
-    let digest = pay_digest(&pk_a, &com_a_next, &request.pk_b, &request.com_b_next);
+    let pair = PairSecret::derive(&key, &pk_a, &request.pk_b)?;
+    let c_v = pair.amount_commitment(request.v)?;
+    let h_ctx = pair.context_hash(request.memo.as_bytes())?;
+    let digest = pay_digest(&PayFields {
+        pk_a: &pk_a,
+        com_a_next: &com_a_next,
+        pk_b: &request.pk_b,
+        com_b_next: &request.com_b_next,
+        c_v: &c_v,
+        h_ctx: &h_ctx,
+    });
     let sig_a = sign_digest(&key, &digest);
     let payer = seal_to(
         &channel_pk,
@@ -184,6 +194,8 @@ pub fn prepare_pay(
             payer,
             pk_b: request.pk_b,
             com_b_next: request.com_b_next,
+            c_v,
+            h_ctx,
         },
         pending: Pending::Pay {
             v: request.v,
@@ -227,6 +239,27 @@ fn check_offer(
     Ok(())
 }
 
+fn check_evidence(
+    key: &SigningKey,
+    offer: &OfferFile,
+    v: u64,
+    memo: &str,
+) -> Result<(), ClientError> {
+    let pair = PairSecret::derive(key, &offer.pk_a, &offer.pk_b)
+        .map_err(|_| ClientError::OfferEvidence { what: "payer key" })?;
+    if pair.amount_commitment(v)? != offer.c_v {
+        return Err(ClientError::OfferEvidence {
+            what: "amount commitment",
+        });
+    }
+    if pair.context_hash(memo.as_bytes())? != offer.h_ctx {
+        return Err(ClientError::OfferEvidence {
+            what: "context hash",
+        });
+    }
+    Ok(())
+}
+
 pub fn prepare_receive(wallet: &Wallet, offer: &OfferFile) -> Result<PreparedReceive, ClientError> {
     let signed = wallet.signed_state()?;
     let Some(Pending::Request {
@@ -234,7 +267,7 @@ pub fn prepare_receive(wallet: &Wallet, offer: &OfferFile) -> Result<PreparedRec
         com_next,
         channel_pk,
         result_pk,
-        ..
+        memo,
     }) = wallet.pending().cloned()
     else {
         return Err(ClientError::NoPending { what: "request" });
@@ -242,7 +275,8 @@ pub fn prepare_receive(wallet: &Wallet, offer: &OfferFile) -> Result<PreparedRec
     let key = wallet.current_key()?;
     let pk_b = key.public_key();
     check_offer(offer, &pk_b, &com_next, &channel_pk)?;
-    let digest = pay_digest(&offer.pk_a, &offer.com_a_next, &pk_b, &com_next);
+    check_evidence(&key, offer, v, &memo)?;
+    let digest = offer.digest();
     let payee = seal_to(
         &channel_pk,
         &PaySecret {
@@ -259,6 +293,8 @@ pub fn prepare_receive(wallet: &Wallet, offer: &OfferFile) -> Result<PreparedRec
             pk_b,
             com_b_next: com_next,
             sig_b: sign_digest(&key, &digest),
+            c_v: offer.c_v,
+            h_ctx: offer.h_ctx,
         },
         payer: offer.payer.clone(),
         payee,

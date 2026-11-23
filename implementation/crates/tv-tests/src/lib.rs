@@ -14,8 +14,9 @@ use tokio::task::JoinHandle;
 use tv_bank::{Bank, EnclaveTrust, Policy, ServerConfig, bank_wallet_path, bind, serve};
 use tv_client::{BankClient, ClientError, OfferFile, Trust, Wallet, flows, payment, seal_to};
 use tv_core::{
-    BankKeys, BankRequest, BankResponse, Bytes32, EnrollRequest, EnrollSecret, PayPublic,
-    PaySecret, Receive, Seed, SigningKey, commitment, enroll_digest, pay_digest, sign_digest,
+    BankKeys, BankRequest, BankResponse, Bytes32, EnrollRequest, EnrollSecret, PairSecret,
+    PayPublic, PaySecret, Receive, Seed, Signature, SigningKey, commitment, enroll_digest,
+    sign_digest,
 };
 use tv_enclave::Enclave;
 
@@ -237,7 +238,12 @@ impl Harness {
         };
         let key = payee.current_key().expect("key");
         let pk_b = key.public_key();
-        let digest = pay_digest(&offer.pk_a, &offer.com_a_next, &pk_b, &com_next);
+        let digest = OfferFile {
+            pk_b,
+            com_b_next: com_next,
+            ..offer.clone()
+        }
+        .digest();
         let payee_blob = seal_to(
             &channel_pk,
             &PaySecret {
@@ -255,6 +261,8 @@ impl Harness {
                 pk_b,
                 com_b_next: com_next,
                 sig_b: sign_digest(&key, &digest),
+                c_v: offer.c_v,
+                h_ctx: offer.h_ctx,
             },
             payer: offer.payer.clone(),
             payee: payee_blob,
@@ -291,16 +299,24 @@ impl Harness {
         let b = &forge.payee_secret.opening;
         let com_a_next = commitment(forge.a_next, &a.next_pk, &a.next_r);
         let com_b_next = commitment(forge.b_next, &b.next_pk, &b.next_r);
-        let digest = pay_digest(&forge.pk_a, &com_a_next, &forge.pk_b, &com_b_next);
+        let (c_v, h_ctx) = forged_evidence(forge);
+        let unsigned = PayPublic {
+            pk_a: forge.pk_a,
+            com_a_next,
+            sig_a: Signature([0u8; 64]),
+            pk_b: forge.pk_b,
+            com_b_next,
+            sig_b: Signature([0u8; 64]),
+            c_v,
+            h_ctx,
+        };
+        let digest = unsigned.digest();
         Receive {
             channel_pk,
             public: PayPublic {
-                pk_a: forge.pk_a,
-                com_a_next,
                 sig_a: sign_digest(&forge.payer_signer, &digest),
-                pk_b: forge.pk_b,
-                com_b_next,
                 sig_b: sign_digest(&forge.payee_signer, &digest),
+                ..unsigned
             },
             payer: seal_to(&channel_pk, &forge.payer_secret).expect("seal"),
             payee: seal_to(&channel_pk, &forge.payee_secret).expect("seal"),
@@ -334,6 +350,17 @@ impl Drop for Harness {
             let _ = tx.send(true);
         }
         let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+fn forged_evidence(forge: &Forge) -> (Bytes32, Bytes32) {
+    match PairSecret::derive(&forge.payer_signer, &forge.pk_a, &forge.pk_b) {
+        Ok(pair) => (
+            pair.amount_commitment(forge.payer_secret.v)
+                .expect("amount commitment"),
+            pair.context_hash(b"").expect("context hash"),
+        ),
+        Err(_) => ([0u8; 32], [0u8; 32]),
     }
 }
 

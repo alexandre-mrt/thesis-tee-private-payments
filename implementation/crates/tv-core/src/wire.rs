@@ -1,7 +1,7 @@
 use pt_tee::channel::{NONCE_LEN, PK_LEN};
 use serde::{Deserialize, Serialize};
 
-use crate::commit::{enroll_digest, pay_digest, refresh_digest};
+use crate::commit::{PayFields, enroll_digest, pay_digest, refresh_digest};
 use crate::result::EnclaveResult;
 use crate::sig::Signature;
 use crate::types::{Bytes32, Manifest, Opening};
@@ -22,11 +22,20 @@ pub struct PayPublic {
     pub pk_b: Bytes32,
     pub com_b_next: Bytes32,
     pub sig_b: Signature,
+    pub c_v: Bytes32,
+    pub h_ctx: Bytes32,
 }
 
 impl PayPublic {
     pub fn digest(&self) -> Bytes32 {
-        pay_digest(&self.pk_a, &self.com_a_next, &self.pk_b, &self.com_b_next)
+        pay_digest(&PayFields {
+            pk_a: &self.pk_a,
+            com_a_next: &self.com_a_next,
+            pk_b: &self.pk_b,
+            com_b_next: &self.com_b_next,
+            c_v: &self.c_v,
+            h_ctx: &self.h_ctx,
+        })
     }
 }
 

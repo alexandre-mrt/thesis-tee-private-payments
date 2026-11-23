@@ -51,6 +51,8 @@ pub fn pay_op(enclave: &Enclave) -> CheckOp {
             pk_b: owner,
             com_b_next: [8u8; 32],
             sig_b: Signature([0u8; 64]),
+            c_v: [9u8; 32],
+            h_ctx: [10u8; 32],
         },
         payer: seal(&channel_pk, PAYER_BALANCE, PAYER_NEXT_PK, PAYER_NEXT_R),
         payee: seal(&channel_pk, 55_555, PAYEE_NEXT_PK, PAYEE_NEXT_R),

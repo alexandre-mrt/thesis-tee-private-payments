@@ -2,8 +2,8 @@ use pt_tee::framing::{read_cbor_bounded, write_frame};
 use pt_tee::transport::{Endpoint, connect};
 use tv_client::{OfferFile, Wallet, flows, payment};
 use tv_core::{
-    BankResponse, PaySecret, Receive, SideKind, SigningKey, commitment, decode_cbor, encode_cbor,
-    pay_digest, sign_digest, sign_result,
+    BankResponse, PaySecret, Receive, SideKind, Signature, SigningKey, commitment, decode_cbor,
+    encode_cbor, sign_digest, sign_result,
 };
 use tv_enclave::LeakedMemory;
 use tv_tests::{Harness, RESERVE, flip};
@@ -56,12 +56,17 @@ async fn theft_with_leaked_opening(s: &Scene) -> Receive {
     let com_a_next = commitment(0, &s.secret.opening.next_pk, &s.secret.opening.next_r);
     let mallory_opening = s.mallory.opening().unwrap();
     let com_m_next = commitment(500, &mallory_opening.next_pk, &mallory_opening.next_r);
-    let digest = pay_digest(
-        &s.offer.pk_a,
-        &com_a_next,
-        &mallory_key.public_key(),
-        &com_m_next,
-    );
+    let unsigned = tv_core::PayPublic {
+        pk_a: s.offer.pk_a,
+        com_a_next,
+        sig_a: Signature([0u8; 64]),
+        pk_b: mallory_key.public_key(),
+        com_b_next: com_m_next,
+        sig_b: Signature([0u8; 64]),
+        c_v: s.offer.c_v,
+        h_ctx: s.offer.h_ctx,
+    };
+    let digest = unsigned.digest();
     let payer = PaySecret {
         v: 500,
         opening: s.secret.opening,
@@ -73,12 +78,9 @@ async fn theft_with_leaked_opening(s: &Scene) -> Receive {
     Receive {
         channel_pk: steal,
         public: tv_core::PayPublic {
-            pk_a: s.offer.pk_a,
-            com_a_next,
             sig_a: sign_digest(&SigningKey::generate(), &digest),
-            pk_b: mallory_key.public_key(),
-            com_b_next: com_m_next,
             sig_b: sign_digest(&mallory_key, &digest),
+            ..unsigned
         },
         payer: tv_client::seal_to(&steal, &payer).unwrap(),
         payee: tv_client::seal_to(&steal, &payee).unwrap(),

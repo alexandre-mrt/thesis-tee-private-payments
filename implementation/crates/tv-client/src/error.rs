@@ -116,6 +116,8 @@ pub enum ClientError {
     Clock,
     #[error("recovery failed: {0}")]
     Recover(String),
+    #[error("the offer's {what} does not match this request; nothing was signed")]
+    OfferEvidence { what: &'static str },
 }
 
 pub fn describe(err: &(dyn std::error::Error + 'static)) -> String {

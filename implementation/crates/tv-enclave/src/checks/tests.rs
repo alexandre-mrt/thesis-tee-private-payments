@@ -1,4 +1,4 @@
-use tv_core::{BankKeys, Signature, SigningKey, pay_digest, sign_digest, sign_state};
+use tv_core::{BankKeys, Signature, SigningKey, sign_digest, sign_state};
 
 use super::*;
 
@@ -53,14 +53,21 @@ fn fixture(v: u64, a_balance: u64, b_balance: u64) -> (Fixture, SigningKey, Sign
     let b = party(b_balance, 20);
     let com_a_next = commitment(a_balance - v, &a.next_pk, &a.next_r);
     let com_b_next = commitment(b_balance + v, &b.next_pk, &b.next_r);
-    let digest = pay_digest(&a.pk, &com_a_next, &b.pk, &com_b_next);
-    let public = PayPublic {
+    let unsigned = PayPublic {
         pk_a: a.pk,
         com_a_next,
-        sig_a: sign_digest(&a.sk, &digest),
+        sig_a: Signature([0u8; 64]),
         pk_b: b.pk,
         com_b_next,
+        sig_b: Signature([0u8; 64]),
+        c_v: [30u8; 32],
+        h_ctx: [31u8; 32],
+    };
+    let digest = unsigned.digest();
+    let public = PayPublic {
+        sig_a: sign_digest(&a.sk, &digest),
         sig_b: sign_digest(&b.sk, &digest),
+        ..unsigned
     };
     let payer = PaySecret {
         v,

@@ -42,6 +42,8 @@ fn sample_receive(f: &SignedFixture) -> Receive {
             pk_b: f.pk,
             com_b_next: f.digest,
             sig_b: f.sig,
+            c_v: f.digest,
+            h_ctx: f.digest,
         },
         payer: f.blob.clone(),
         payee: f.blob.clone(),

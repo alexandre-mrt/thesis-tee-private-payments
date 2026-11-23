@@ -14,8 +14,8 @@ pub mod wire;
 
 pub use cbor::{decode_cbor, encode_cbor};
 pub use commit::{
-    amount_commitment, commitment, context_hash, enroll_digest, manifest_digest, pay_digest,
-    refresh_digest,
+    PayFields, amount_commitment, commitment, context_hash, enroll_digest, manifest_digest,
+    pay_digest, refresh_digest,
 };
 pub use derive::{Seed, derive_r, derive_sk};
 pub use error::CoreError;
@@ -53,7 +53,7 @@ pub const LABEL_NCTX: &[u8] = b"ctx";
 pub const LABEL_DV: &[u8] = b"dv";
 pub const DOMAIN_COM: &[u8] = b"tv/v1/com";
 pub const DOMAIN_STATE: &[u8] = b"tv/v1/state";
-pub const DOMAIN_PAY: &[u8] = b"tv/v1/pay";
+pub const DOMAIN_PAY: &[u8] = b"tv/v1/pay/2";
 pub const DOMAIN_REFRESH: &[u8] = b"tv/v1/refresh";
 pub const DOMAIN_ENROLL: &[u8] = b"tv/v1/enroll";
 pub const DOMAIN_RESULT: &[u8] = b"tv/v1/result/ok";

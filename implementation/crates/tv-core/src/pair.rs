@@ -3,6 +3,7 @@ use sha2::Sha256;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use crate::commit::{amount_commitment, context_hash};
 use crate::error::CoreError;
 use crate::sig::{SigningKey, VerifyingKey};
 use crate::types::Bytes32;
@@ -87,6 +88,14 @@ impl PairSecret {
 
     pub fn n_ctx(&self) -> Result<Bytes32, CoreError> {
         expand(&self.k_ab, LABEL_NCTX)
+    }
+
+    pub fn amount_commitment(&self, v: u64) -> Result<Bytes32, CoreError> {
+        Ok(amount_commitment(v, &self.r_v()?))
+    }
+
+    pub fn context_hash(&self, memo: &[u8]) -> Result<Bytes32, CoreError> {
+        context_hash(&self.n_ctx()?, memo)
     }
 }
 
