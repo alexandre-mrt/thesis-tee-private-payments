@@ -18,3 +18,8 @@ ed25519-dalek.workspace = true
 rand.workspace = true
 hex.workspace = true
 thiserror.workspace = true
+x25519-dalek.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

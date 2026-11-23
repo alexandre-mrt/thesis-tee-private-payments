@@ -46,6 +46,10 @@ impl SigningKey {
     pub fn sign(&self, message: &[u8]) -> Signature {
         Signature(self.0.sign(message).to_bytes())
     }
+
+    pub(crate) fn scalar_bytes(&self) -> Bytes32 {
+        self.0.to_scalar_bytes()
+    }
 }
 
 #[derive(Clone)]
@@ -82,6 +86,10 @@ impl VerifyingKey {
 
     pub fn is_weak(&self) -> bool {
         self.key.is_weak()
+    }
+
+    pub(crate) fn montgomery(&self) -> Bytes32 {
+        self.key.to_montgomery().to_bytes()
     }
 
     pub fn verify(&self, message: &[u8], sig: &Signature) -> Result<(), CoreError> {

@@ -47,6 +47,8 @@ clap = { version = "4", features = ["derive", "env"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 zeroizing-alloc = "0.1"
+zeroize = { version = "1", features = ["derive"] }
+proptest = "1"
 
 [profile.release]
 lto = "thin"

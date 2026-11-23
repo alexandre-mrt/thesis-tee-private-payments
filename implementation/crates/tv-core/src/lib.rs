@@ -6,6 +6,7 @@ pub mod cbor;
 pub mod commit;
 pub mod derive;
 pub mod error;
+pub mod pair;
 pub mod result;
 pub mod sig;
 pub mod types;
@@ -18,6 +19,7 @@ pub use commit::{
 };
 pub use derive::{Seed, derive_r, derive_sk};
 pub use error::CoreError;
+pub use pair::{PairSecret, designated_key};
 pub use result::{EnclaveResult, sign_result, verify_result, verify_result_with};
 pub use sig::{
     BankVerifiers, SIG_LEN, Signature, SigningKey, VerifyingKey, sign_digest, sign_state,
@@ -45,6 +47,10 @@ pub const ATTEST_CLOCK_SKEW: Duration = Duration::from_secs(30);
 pub const HKDF_SALT: &[u8] = b"tv/v1";
 pub const LABEL_SK: &[u8] = b"sk";
 pub const LABEL_R: &[u8] = b"r";
+pub const LABEL_PAIR: &[u8] = b"pair";
+pub const LABEL_RV: &[u8] = b"rv";
+pub const LABEL_NCTX: &[u8] = b"ctx";
+pub const LABEL_DV: &[u8] = b"dv";
 pub const DOMAIN_COM: &[u8] = b"tv/v1/com";
 pub const DOMAIN_STATE: &[u8] = b"tv/v1/state";
 pub const DOMAIN_PAY: &[u8] = b"tv/v1/pay";
