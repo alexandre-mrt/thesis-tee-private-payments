@@ -1,5 +1,5 @@
 use std::io::IsTerminal;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
@@ -7,6 +7,7 @@ use tracing_subscriber::EnvFilter;
 use tv_client::error::describe;
 use tv_client::ops::{Session, balance, create_wallet, seed_hex};
 use tv_client::proof::Mode;
+use tv_client::verifier::{read_verifier_key, write_verifier_key};
 use tv_client::{DEFAULT_BANK, Trust, parse_pcr0};
 use tv_core::{BankKeys, Bytes32, Seed, SigningKey, VerifyingKey};
 
@@ -78,10 +79,10 @@ struct VerifyArgs {
     challenge: String,
     #[arg(
         long,
-        value_name = "HEX",
-        help = "Verifier secret key (designated proofs)"
+        value_name = "PATH",
+        help = "File holding the verifier secret key, mode 600 (designated proofs)"
     )]
-    verifier_sk: Option<String>,
+    verifier_sk_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -195,8 +196,13 @@ enum Command {
     ProvePayment(ProveArgs),
     #[command(about = "Verify a proof of payment against the bank keys pinned in this wallet")]
     VerifyProof(VerifyArgs),
-    #[command(about = "Print a fresh verifier key pair for designated proofs")]
-    VerifierKey,
+    #[command(
+        about = "Write a fresh verifier secret key for designated proofs to a mode 600 file; prints verifier_pk=HEX"
+    )]
+    VerifierKey {
+        #[arg(long, help = "Where to write the secret key (must not exist)")]
+        out: PathBuf,
+    },
 }
 
 fn parse_hex32(text: &str, what: &str) -> anyhow::Result<Bytes32> {
@@ -250,20 +256,17 @@ async fn prove(session: &Session, args: &ProveArgs) -> anyhow::Result<String> {
 fn verify(session: &Session, args: &VerifyArgs) -> anyhow::Result<String> {
     let challenge = parse_hex32(&args.challenge, "--challenge")?;
     let verifier = args
-        .verifier_sk
+        .verifier_sk_file
         .as_deref()
-        .map(|sk| parse_hex32(sk, "--verifier-sk").map(|b| SigningKey::from_bytes(&b)))
+        .map(read_verifier_key)
         .transpose()?;
     Ok(session.verify_payment(&args.proof, &challenge, verifier.as_ref())?)
 }
 
-fn verifier_key() -> String {
+fn verifier_key(out: &Path) -> anyhow::Result<String> {
     let key = SigningKey::generate();
-    format!(
-        "verifier_sk={}\nverifier_pk={}",
-        hex::encode(key.to_bytes()),
-        hex::encode(key.public_key())
-    )
+    write_verifier_key(out, &key)?;
+    Ok(format!("verifier_pk={}", hex::encode(key.public_key())))
 }
 
 async fn run(cli: Cli) -> anyhow::Result<String> {
@@ -310,7 +313,7 @@ async fn run(cli: Cli) -> anyhow::Result<String> {
         Command::Recover => session()?.recover().await?,
         Command::ProvePayment(args) => prove(&session()?, &args).await?,
         Command::VerifyProof(args) => verify(&session()?, &args)?,
-        Command::VerifierKey => verifier_key(),
+        Command::VerifierKey { out } => verifier_key(&out)?,
     })
 }
 

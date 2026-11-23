@@ -11,6 +11,7 @@ pub mod payment;
 pub mod proof;
 pub mod recover;
 pub mod retry;
+pub mod verifier;
 pub mod wallet;
 
 pub use attest::{AttestationBundle, PCR0_LEN, Trust, parse_pcr0, verify_bundle};

@@ -24,11 +24,9 @@ echo "== alice proves she paid, bob proves to alice that he received (designated
 SEQ="$(sed -n 's/^ *"seq": \([0-9]*\),$/\1/p' "${DATA}/receipt-pay.json" | head -1)"
 cli alice prove-payment --seq "${SEQ}" --mode payer --challenge "$(printf '11%.0s' {1..32})" --out "${DATA}/proof-payer.json"
 cli bob verify-proof --proof "${DATA}/proof-payer.json" --challenge "$(printf '11%.0s' {1..32})"
-VERIFIER="$(cli alice verifier-key)"
-VERIFIER_SK="$(sed -n 's/^verifier_sk=//p' <<<"${VERIFIER}")"
-VERIFIER_PK="$(sed -n 's/^verifier_pk=//p' <<<"${VERIFIER}")"
+VERIFIER_PK="$(cli alice verifier-key --out "${DATA}/alice-verifier.key" | sed -n 's/^verifier_pk=//p')"
 cli bob prove-payment --seq "${SEQ}" --mode designated --verifier-pk "${VERIFIER_PK}" --challenge "$(printf '22%.0s' {1..32})" --out "${DATA}/proof-payee.json"
-cli alice verify-proof --proof "${DATA}/proof-payee.json" --challenge "$(printf '22%.0s' {1..32})" --verifier-sk "${VERIFIER_SK}"
+cli alice verify-proof --proof "${DATA}/proof-payee.json" --challenge "$(printf '22%.0s' {1..32})" --verifier-sk-file "${DATA}/alice-verifier.key"
 
 echo "== the auditor replays the log"
 "${BIN}/tv-bank" verify-log --data "${BANK_DATA}" --receipt-pk "${RECEIPT_PK}"
