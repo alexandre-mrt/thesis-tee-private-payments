@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
