@@ -10,6 +10,8 @@ pub enum CoreError {
     BadSignature,
     #[error("key derivation failed")]
     Derivation,
+    #[error("proof refused: {what}")]
+    BadProof { what: &'static str },
     #[error("log entry {seq} does not extend the chain head before it")]
     BrokenChain { seq: u64 },
     #[error("log entry: {what} is malformed")]

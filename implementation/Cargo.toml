@@ -48,6 +48,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 zeroizing-alloc = "0.1"
 zeroize = { version = "1", features = ["derive"] }
+hmac = "0.13"
 proptest = "1"
 
 [profile.release]

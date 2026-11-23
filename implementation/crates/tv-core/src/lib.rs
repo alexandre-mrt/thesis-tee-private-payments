@@ -9,6 +9,7 @@ pub mod entry;
 pub mod error;
 pub mod evidence;
 pub mod pair;
+pub mod proof;
 pub mod receipt;
 pub mod result;
 pub mod sig;
@@ -25,6 +26,10 @@ pub use entry::LogEntry;
 pub use error::CoreError;
 pub use evidence::{chain_genesis, chain_next, entry_hash, receipt_digest};
 pub use pair::{PairSecret, designated_key};
+pub use proof::{
+    AmountOpening, ContextOpening, Presentation, Proof, ProofFacts, ProofKeys, Role,
+    designated_tag, sign_presentation, verify_proof,
+};
 pub use receipt::{Receipt, epoch_of, is_fork};
 pub use result::{EnclaveResult, sign_result, verify_result, verify_result_with};
 pub use sig::{
@@ -69,6 +74,8 @@ pub const DOMAIN_ENTRY: &[u8] = b"tv/v1/entry";
 pub const DOMAIN_CHAIN: &[u8] = b"tv/v1/chain";
 pub const DOMAIN_CHAIN0: &[u8] = b"tv/v1/chain/0";
 pub const DOMAIN_RCPT: &[u8] = b"tv/v1/rcpt";
+pub const DOMAIN_POP: &[u8] = b"tv/v1/pop";
+pub const DOMAIN_DV: &[u8] = b"tv/v1/dv";
 
 pub const MAX_MEMO_LEN: usize = 1024;
 
@@ -94,6 +101,8 @@ mod tests {
             DOMAIN_CHAIN,
             DOMAIN_CHAIN0,
             DOMAIN_RCPT,
+            DOMAIN_POP,
+            DOMAIN_DV,
         ];
         for (i, a) in domains.iter().enumerate() {
             for (j, b) in domains.iter().enumerate() {
