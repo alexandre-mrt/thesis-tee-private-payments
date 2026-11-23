@@ -130,22 +130,15 @@ pub struct Payment {
     b_next: u64,
 }
 
-pub fn payment(payer: &Party, payee: &Party, v: u64, channel_pk: &[u8; PK_LEN]) -> Result<Payment> {
-    let a_next = payer
-        .balance()
-        .checked_sub(v)
-        .context("payer balance too low")?;
-    let b_next = payee
-        .balance()
-        .checked_add(v)
-        .context("payee balance overflow")?;
-    let payer_opening = payer.opening()?;
-    let payee_opening = payee.opening()?;
-    let com_a_next = commitment(a_next, &payer_opening.next_pk, &payer_opening.next_r);
-    let com_b_next = commitment(b_next, &payee_opening.next_pk, &payee_opening.next_r);
-    let pk_a = payer.pk()?;
-    let pk_b = payee.pk()?;
+fn signed_public(
+    payer: &Party,
+    payee: &Party,
+    v: u64,
+    com_a_next: Bytes32,
+    com_b_next: Bytes32,
+) -> Result<PayPublic> {
     let (payer_key, payee_key) = (payer.key()?, payee.key()?);
+    let (pk_a, pk_b) = (payer_key.public_key(), payee_key.public_key());
     let pair = PairSecret::derive(&payer_key, &pk_a, &pk_b)?;
     let unsigned = PayPublic {
         pk_a,
@@ -163,13 +156,29 @@ pub fn payment(payer: &Party, payee: &Party, v: u64, channel_pk: &[u8; PK_LEN]) 
         bail!("the payee's pair secret disagrees with the payer's");
     }
     let digest = unsigned.digest();
+    Ok(PayPublic {
+        sig_a: sign_digest(&payer_key, &digest),
+        sig_b: sign_digest(&payee_key, &digest),
+        ..unsigned
+    })
+}
+
+pub fn payment(payer: &Party, payee: &Party, v: u64, channel_pk: &[u8; PK_LEN]) -> Result<Payment> {
+    let a_next = payer
+        .balance()
+        .checked_sub(v)
+        .context("payer balance too low")?;
+    let b_next = payee
+        .balance()
+        .checked_add(v)
+        .context("payee balance overflow")?;
+    let payer_opening = payer.opening()?;
+    let payee_opening = payee.opening()?;
+    let com_a_next = commitment(a_next, &payer_opening.next_pk, &payer_opening.next_r);
+    let com_b_next = commitment(b_next, &payee_opening.next_pk, &payee_opening.next_r);
     let receive = Receive {
         channel_pk: *channel_pk,
-        public: PayPublic {
-            sig_a: sign_digest(&payer_key, &digest),
-            sig_b: sign_digest(&payee_key, &digest),
-            ..unsigned
-        },
+        public: signed_public(payer, payee, v, com_a_next, com_b_next)?,
         payer: seal_to(
             channel_pk,
             &PaySecret {

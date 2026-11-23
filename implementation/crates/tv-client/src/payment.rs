@@ -1,7 +1,8 @@
 use pt_tee::attestation::AttestationVerifier;
 use tv_core::{
     B_MAX, BankRequest, BankResponse, Bytes32, CoreError, MAX_MEMO_LEN, PairSecret, PayFields,
-    PayPublic, PaySecret, Receive, Signature, SigningKey, commitment, pay_digest, sign_digest,
+    PayPublic, PaySecret, Receive, SealedBlob, Signature, SigningKey, commitment, pay_digest,
+    sign_digest,
 };
 
 use crate::attest::verify_bundle;
@@ -157,11 +158,11 @@ pub fn pay(
     commit_pay(wallet, prepared)
 }
 
-pub fn prepare_pay(
+fn checked_channel(
     wallet: &Wallet,
     verifier: &AttestationVerifier,
     request: &RequestFile,
-) -> Result<PreparedPay, ClientError> {
+) -> Result<Bytes32, ClientError> {
     wallet.signed_state()?;
     let channel_pk = verify_bundle(verifier, &request.attestation)?;
     if request.attestation.manifest.bank != wallet.bank() {
@@ -170,6 +171,15 @@ pub fn prepare_pay(
     if request.v == 0 {
         return Err(ClientError::ZeroAmount);
     }
+    Ok(channel_pk)
+}
+
+fn signed_offer(
+    wallet: &Wallet,
+    request: &RequestFile,
+    channel_pk: Bytes32,
+    payer: SealedBlob,
+) -> Result<(OfferFile, Bytes32), ClientError> {
     let key = wallet.current_key()?;
     let pk_a = key.public_key();
     if pk_a == request.pk_b {
@@ -187,7 +197,26 @@ pub fn prepare_pay(
         c_v: &c_v,
         h_ctx: &h_ctx,
     });
-    let sig_a = sign_digest(&key, &digest);
+    let offer = OfferFile {
+        channel_pk,
+        pk_a,
+        com_a_next,
+        sig_a: sign_digest(&key, &digest),
+        payer,
+        pk_b: request.pk_b,
+        com_b_next: request.com_b_next,
+        c_v,
+        h_ctx,
+    };
+    Ok((offer, digest))
+}
+
+pub fn prepare_pay(
+    wallet: &Wallet,
+    verifier: &AttestationVerifier,
+    request: &RequestFile,
+) -> Result<PreparedPay, ClientError> {
+    let channel_pk = checked_channel(wallet, verifier, request)?;
     let payer = seal_to(
         &channel_pk,
         &PaySecret {
@@ -195,28 +224,17 @@ pub fn prepare_pay(
             opening: wallet.opening()?,
         },
     )?;
-    Ok(PreparedPay {
-        offer: OfferFile {
-            channel_pk,
-            pk_a,
-            com_a_next,
-            sig_a,
-            payer,
-            pk_b: request.pk_b,
-            com_b_next: request.com_b_next,
-            c_v,
-            h_ctx,
-        },
-        pending: Pending::Pay {
-            v: request.v,
-            pk_b: request.pk_b,
-            com_b_next: request.com_b_next,
-            com_a_next,
-            digest,
-            h_ctx,
-            memo: request.memo.clone(),
-        },
-    })
+    let (offer, digest) = signed_offer(wallet, request, channel_pk, payer)?;
+    let pending = Pending::Pay {
+        v: request.v,
+        pk_b: offer.pk_b,
+        com_b_next: offer.com_b_next,
+        com_a_next: offer.com_a_next,
+        digest,
+        h_ctx: offer.h_ctx,
+        memo: request.memo.clone(),
+    };
+    Ok(PreparedPay { offer, pending })
 }
 
 pub struct PreparedReceive {
