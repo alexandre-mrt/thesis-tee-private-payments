@@ -9,8 +9,8 @@ use tv_client::{
 };
 use tv_core::{
     BankRequest, BankResponse, CheckOp, EnclaveRequest, EnclaveResponse, LogEntry, OpKind,
-    PaySecret, RefreshRequest, RefreshSecret, SideKind, SigningKey, encode_cbor, pay_digest,
-    random_bytes32, refresh_digest, sign_digest, sign_result,
+    PaySecret, RefreshRequest, RefreshSecret, SideKind, SigningKey, encode_cbor, random_bytes32,
+    refresh_digest, sign_digest, sign_result,
 };
 
 use crate::latency::{bank_party, enroll_over_tcp, funded_wallets, pay_over_tcp};
@@ -136,12 +136,7 @@ fn user_wire_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
 
 fn enclave_and_log_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
     let public = s.payment.receive.public;
-    let digest = pay_digest(
-        &public.pk_a,
-        &public.com_a_next,
-        &public.pk_b,
-        &public.com_b_next,
-    );
+    let digest = public.digest();
     let check = EnclaveRequest::Check {
         bank_nonce: random_bytes32(),
         op: CheckOp::Pay(Box::new(s.payment.receive.clone())),
@@ -221,12 +216,7 @@ fn file_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
         com_b_next: public.com_b_next,
     };
     let receipt_file = ReceiptFile {
-        digest: pay_digest(
-            &public.pk_a,
-            &public.com_a_next,
-            &public.pk_b,
-            &public.com_b_next,
-        ),
+        digest: public.digest(),
         pk_a: public.pk_a,
         com_a_next: public.com_a_next,
         sig_a_next,

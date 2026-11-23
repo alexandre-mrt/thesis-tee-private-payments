@@ -1,4 +1,4 @@
-use tv_core::{BankKeys, Signature, SigningKey, sign_digest, sign_state};
+use tv_core::{BankKeys, Signature, SigningKey, pay_digest, sign_digest, sign_state};
 
 use super::*;
 
@@ -87,15 +87,7 @@ fn valid_payment_passes_with_user_sides() {
     let (f, _, _) = fixture(30, 100, 50);
     let checked = check_pay(&f.bank, &f.public, &f.payer, &f.payee).unwrap();
     assert_eq!(checked.sides, vec![SideKind::User, SideKind::User]);
-    assert_eq!(
-        checked.digest,
-        pay_digest(
-            &f.public.pk_a,
-            &f.public.com_a_next,
-            &f.public.pk_b,
-            &f.public.com_b_next
-        )
-    );
+    assert_eq!(checked.digest, f.public.digest());
 }
 
 #[test]

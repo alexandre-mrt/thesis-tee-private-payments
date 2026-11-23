@@ -1,5 +1,5 @@
 use tv_core::{
-    Bytes32, CheckOp, EnrollRequest, OpKind, Receive, RefreshRequest, enroll_digest, pay_digest,
+    Bytes32, CheckOp, EnrollRequest, OpKind, Receive, RefreshRequest, enroll_digest,
     refresh_digest, verify_digest,
 };
 
@@ -10,7 +10,7 @@ use crate::link::EnclaveLink;
 impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
     pub(super) async fn receive(&self, receive: &Receive) -> Outcome {
         let p = &receive.public;
-        let digest = pay_digest(&p.pk_a, &p.com_a_next, &p.pk_b, &p.com_b_next);
+        let digest = p.digest();
         let _claim = match self.claim(digest).await {
             Ok(claim) => claim,
             Err(outcome) => return outcome,

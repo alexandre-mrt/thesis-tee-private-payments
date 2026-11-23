@@ -38,12 +38,7 @@ async fn forged_or_reused_payer_signature_is_refused_even_by_a_lenient_enclave()
 
     let mut redirected = h.build_receive(&bob, &offer);
     redirected.public.com_b_next = flip(&redirected.public.com_b_next);
-    let digest = tv_core::pay_digest(
-        &redirected.public.pk_a,
-        &redirected.public.com_a_next,
-        &redirected.public.pk_b,
-        &redirected.public.com_b_next,
-    );
+    let digest = redirected.public.digest();
     redirected.public.sig_b = sign_digest(&bob.current_key().unwrap(), &digest);
     refused(&h, redirected).await;
 

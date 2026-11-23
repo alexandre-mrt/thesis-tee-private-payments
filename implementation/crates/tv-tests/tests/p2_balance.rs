@@ -169,12 +169,7 @@ async fn there_is_no_path_for_a_user_to_submit_a_signed_result() {
     let (h, alice, bob) = setup().await;
     let mint = h.forge(&alice, &bob, 100);
     let receive = h.forge_receive(&mint).await;
-    let digest = tv_core::pay_digest(
-        &receive.public.pk_a,
-        &receive.public.com_a_next,
-        &receive.public.pk_b,
-        &receive.public.com_b_next,
-    );
+    let digest = receive.public.digest();
     let forged = sign_result(
         &h.result_key,
         [0u8; 32],

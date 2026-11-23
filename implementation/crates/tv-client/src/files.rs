@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tracing::warn;
-use tv_core::{Bytes32, SealedBlob, Signature};
+use tv_core::{Bytes32, SealedBlob, Signature, pay_digest};
 
 use crate::attest::AttestationBundle;
 use crate::error::ClientError;
@@ -28,6 +28,12 @@ pub struct OfferFile {
     pub payer: SealedBlob,
     pub pk_b: Bytes32,
     pub com_b_next: Bytes32,
+}
+
+impl OfferFile {
+    pub fn digest(&self) -> Bytes32 {
+        pay_digest(&self.pk_a, &self.com_a_next, &self.pk_b, &self.com_b_next)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

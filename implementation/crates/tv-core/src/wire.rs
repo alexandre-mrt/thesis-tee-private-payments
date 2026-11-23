@@ -24,6 +24,12 @@ pub struct PayPublic {
     pub sig_b: Signature,
 }
 
+impl PayPublic {
+    pub fn digest(&self) -> Bytes32 {
+        pay_digest(&self.pk_a, &self.com_a_next, &self.pk_b, &self.com_b_next)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PaySecret {
     pub v: u64,
@@ -155,12 +161,7 @@ impl CheckOp {
 
     pub fn digest(&self) -> Bytes32 {
         match self {
-            CheckOp::Pay(r) => pay_digest(
-                &r.public.pk_a,
-                &r.public.com_a_next,
-                &r.public.pk_b,
-                &r.public.com_b_next,
-            ),
+            CheckOp::Pay(r) => r.public.digest(),
             CheckOp::Enroll(r) => enroll_digest(&r.pk0, &r.com0),
             CheckOp::Refresh(r) => refresh_digest(&r.pk, &r.com_next),
         }

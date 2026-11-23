@@ -1,6 +1,6 @@
 use tv_core::{
     B_MAX, BankVerifiers, Bytes32, EnrollRequest, EnrollSecret, Opening, PayPublic, PaySecret,
-    RefreshRequest, RefreshSecret, SideKind, commitment, enroll_digest, pay_digest, refresh_digest,
+    RefreshRequest, RefreshSecret, SideKind, commitment, enroll_digest, refresh_digest,
     verify_digest,
 };
 
@@ -75,12 +75,7 @@ pub fn check_pay(
     payer: &PaySecret,
     payee: &PaySecret,
 ) -> Result<Checked, Refusal> {
-    let digest = pay_digest(
-        &public.pk_a,
-        &public.com_a_next,
-        &public.pk_b,
-        &public.com_b_next,
-    );
+    let digest = public.digest();
     let a_next = payer.opening.balance.wrapping_sub(payer.v);
     let b_next = payee.opening.balance.wrapping_add(payer.v);
     let expected_a = commitment(a_next, &payer.opening.next_pk, &payer.opening.next_r);

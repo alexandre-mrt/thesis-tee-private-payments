@@ -125,12 +125,7 @@ async fn leaked_channel_keys_do_not_spend_alice_s_state() {
 async fn a_leaked_result_key_has_no_path_into_the_bank() {
     let mut s = scene().await;
     let entries = s.h.bank().entries().len();
-    let digest = pay_digest(
-        &s.offer.pk_a,
-        &s.offer.com_a_next,
-        &s.offer.pk_b,
-        &s.offer.com_b_next,
-    );
+    let digest = s.offer.digest();
     let minted = sign_result(
         &s.leaked.result_key,
         [0u8; 32],

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use tv_client::ops::Session;
 use tv_client::{OfferFile, RequestFile};
-use tv_core::{Bytes32, pay_digest};
+use tv_core::Bytes32;
 
 use crate::error::BankError;
 use crate::journal::is_zeroed_tail;
@@ -103,12 +103,7 @@ fn record_of(request: &RequestFile, offer: &OfferFile) -> Result<IssuanceRecord,
         unix_secs: u64::try_from(now_unix_secs()?).map_err(|_| BankError::Clock)?,
         amount: request.v,
         payee: request.pk_b,
-        digest: pay_digest(
-            &offer.pk_a,
-            &offer.com_a_next,
-            &offer.pk_b,
-            &offer.com_b_next,
-        ),
+        digest: offer.digest(),
     })
 }
 
