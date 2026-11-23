@@ -306,3 +306,50 @@ fn refresh_checks() {
         Err(Refusal::NextCommitment)
     );
 }
+
+fn mutated(public: &PayPublic, field: usize, byte: usize) -> PayPublic {
+    let flip = |bytes: &Bytes32| {
+        let mut out = *bytes;
+        out[byte] ^= 0x01;
+        out
+    };
+    match field {
+        0 => PayPublic {
+            c_v: flip(&public.c_v),
+            ..*public
+        },
+        1 => PayPublic {
+            h_ctx: flip(&public.h_ctx),
+            ..*public
+        },
+        2 => PayPublic {
+            pk_b: flip(&public.pk_b),
+            ..*public
+        },
+        _ => PayPublic {
+            com_b_next: flip(&public.com_b_next),
+            ..*public
+        },
+    }
+}
+
+proptest::proptest! {
+    #[test]
+    fn nr1_a_mutated_payee_field_voids_the_payer_signature(
+        field in 0usize..4,
+        byte in 0usize..32,
+        v in 1u64..100,
+    ) {
+        let (f, _, _) = fixture(v, 100, 50);
+        let changed = mutated(&f.public, field, byte);
+        let pk_a = tv_core::VerifyingKey::parse(&changed.pk_a).unwrap();
+        proptest::prop_assert!(pk_a.verify_digest(&changed.digest(), &changed.sig_a).is_err());
+        proptest::prop_assert!(check_pay(&f.bank, &changed, &f.payer, &f.payee).is_err());
+        if field < 2 {
+            proptest::prop_assert_eq!(
+                check_pay(&f.bank, &changed, &f.payer, &f.payee).err(),
+                Some(Refusal::OwnerSignature)
+            );
+        }
+    }
+}
