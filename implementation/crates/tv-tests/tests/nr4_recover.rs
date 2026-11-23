@@ -89,8 +89,7 @@ async fn a_wallet_proves_only_its_own_side_and_designated_proofs_need_the_verifi
     assert!(check(&carol, &proof, &CHALLENGE, None).is_err());
     assert!(check(&carol, &proof, &CHALLENGE, Some(&SigningKey::generate())).is_err());
     let amount = prove(&alice, &log, seq, Mode::Amount, CHALLENGE).unwrap();
-    assert_eq!(
-        check(&carol, &amount, &CHALLENGE, None).unwrap().holder,
-        None
-    );
+    let amount_facts = check(&carol, &amount, &CHALLENGE, None).unwrap();
+    assert_eq!(amount_facts.holder, None);
+    assert!(amount_facts.transferable);
 }

@@ -25,3 +25,10 @@ fn a_signed_proof_is_described_as_transferable() {
     assert!(line.contains("(transferable)"), "{line}");
     assert!(!line.contains(DESIGNATED_SCOPE), "{line}");
 }
+
+#[test]
+fn an_amount_proof_is_described_as_transferable() {
+    let line = describe(&facts(None, true));
+    assert!(line.contains("nobody (amount only)"), "{line}");
+    assert!(line.contains("(transferable)"), "{line}");
+}

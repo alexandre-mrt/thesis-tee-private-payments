@@ -151,7 +151,7 @@ fn honest_proofs_of_every_mode_verify_and_state_what_they_prove() {
         let facts = check(&w, &proof(&w, mode), &CHALLENGE).unwrap();
         assert_eq!((facts.seq, facts.epoch, facts.v), (3, 9, 250));
         assert_eq!(facts.memo.as_deref(), Some(MEMO));
-        assert_eq!(facts.transferable, mode < 2);
+        assert_eq!(facts.transferable, mode < 3);
     }
     let payer = check(&w, &proof(&w, 0), &CHALLENGE).unwrap();
     assert_eq!(payer.holder, Some((Role::Payer, w.alice.public_key())));
@@ -202,6 +202,7 @@ fn a_designated_proof_hides_who_presented_but_not_the_amount_or_context() {
     assert_eq!(facts.v, 17);
     assert_eq!(facts.memo.as_deref(), Some(MEMO));
     assert_eq!(facts.holder, None);
+    assert!(facts.transferable);
 }
 
 proptest! {

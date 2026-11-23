@@ -226,6 +226,6 @@ pub fn verify_proof(
         v: proof.amount.v,
         memo,
         holder,
-        transferable: matches!(proof.presentation, Presentation::Signed { .. }),
+        transferable: !matches!(proof.presentation, Presentation::Designated { .. }),
     })
 }
