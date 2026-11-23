@@ -1,10 +1,11 @@
 use std::time::{Duration, Instant};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use pt_tee::framing::LEN_PREFIX;
 use serde::Serialize;
+use tv_client::proof::{Mode, check, prove};
 use tv_client::{
-    Attested, OfferFile, ReceiptFile, RequestFile, payment as wallet_payment, seal_to,
+    Attested, OfferFile, ReceiptFile, RequestFile, Wallet, payment as wallet_payment, seal_to,
     verify_bundle,
 };
 use tv_core::{
@@ -23,6 +24,25 @@ pub struct ClientCost {
     pub verify: Vec<Duration>,
     pub seal: Vec<Duration>,
     pub offer: Vec<Duration>,
+    pub prove: Vec<Duration>,
+    pub verify_proof: Vec<Duration>,
+    pub log_entries: usize,
+}
+
+const PROOF_CHALLENGE: [u8; 32] = [9u8; 32];
+
+fn proof_cost(alice: &Wallet, bob: &Wallet, log: &[LogEntry], cost: &mut ClientCost) -> Result<()> {
+    let seq = alice
+        .head()
+        .context("the funded wallet saw no receipt")?
+        .seq;
+    let start = Instant::now();
+    let proof = prove(alice, log, seq, Mode::Payee, PROOF_CHALLENGE)?;
+    cost.prove.push(start.elapsed());
+    let start = Instant::now();
+    check(bob, &proof, &PROOF_CHALLENGE, None)?;
+    cost.verify_proof.push(start.elapsed());
+    Ok(())
 }
 
 pub async fn client_cost(lb: &Loopback, iterations: usize) -> Result<ClientCost> {
@@ -30,10 +50,14 @@ pub async fn client_cost(lb: &Loopback, iterations: usize) -> Result<ClientCost>
     let (alice, mut bob) = funded_wallets(lb, "cost", COST_FUNDING).await?;
     let request = wallet_payment::request(&mut bob, client, Some(1)).await?;
     let verifier = client.verifier();
+    let log = client.full_log().await?;
     let mut cost = ClientCost {
         verify: Vec::with_capacity(iterations),
         seal: Vec::with_capacity(iterations),
         offer: Vec::with_capacity(iterations),
+        prove: Vec::with_capacity(iterations),
+        verify_proof: Vec::with_capacity(iterations),
+        log_entries: log.len(),
     };
     for _ in 0..iterations {
         let start = Instant::now();
@@ -49,6 +73,7 @@ pub async fn client_cost(lb: &Loopback, iterations: usize) -> Result<ClientCost>
         let start = Instant::now();
         wallet_payment::prepare_pay(&alice, verifier, &request)?;
         cost.offer.push(start.elapsed());
+        proof_cost(&alice, &bob, &log, &mut cost)?;
     }
     Ok(cost)
 }

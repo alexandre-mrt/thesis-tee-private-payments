@@ -38,8 +38,10 @@ fn random_signature() -> Signature {
     Signature(bytes)
 }
 
+pub const PER_OP_DIR: &str = "store-per-op";
+
 pub fn append_per_op(root: &Path, count: usize) -> Result<Duration> {
-    let dir = root.join("store-per-op");
+    let dir = root.join(PER_OP_DIR);
     std::fs::create_dir_all(&dir)?;
     let mut store = fresh_store(&dir)?;
     let entries: Vec<LogEntry> = (0..count as u64).map(pay_entry).collect();
@@ -47,7 +49,9 @@ pub fn append_per_op(root: &Path, count: usize) -> Result<Duration> {
     for entry in entries {
         store.append(entry)?;
     }
-    Ok(start.elapsed())
+    let elapsed = start.elapsed();
+    drop(store);
+    Ok(elapsed)
 }
 
 pub async fn append_group_commit(

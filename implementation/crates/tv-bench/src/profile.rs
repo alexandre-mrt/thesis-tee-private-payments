@@ -9,7 +9,7 @@ use tv_core::{
     random_bytes32, sign_digest, verify_digest,
 };
 
-fn time<T>(iterations: usize, mut op: impl FnMut() -> T) -> Duration {
+pub fn time<T>(iterations: usize, mut op: impl FnMut() -> T) -> Duration {
     let start = Instant::now();
     for _ in 0..iterations {
         std::hint::black_box(op());

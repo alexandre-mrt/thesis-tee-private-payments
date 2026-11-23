@@ -2,6 +2,7 @@
 
 mod client;
 mod enclave;
+mod evidence;
 mod latency;
 mod party;
 mod profile;
@@ -94,7 +95,11 @@ fn print_percentiles(label: &str, samples: &[std::time::Duration]) {
 
 fn sync_benches(args: &Args, root: &Path) -> Result<()> {
     println!("== primitive costs (mean per operation)");
-    for (label, per_op) in profile::primitives(args.iterations * PROFILE_SCALE)? {
+    let iterations = args.iterations * PROFILE_SCALE;
+    for (label, per_op) in profile::primitives(iterations)?
+        .into_iter()
+        .chain(evidence::costs(iterations)?)
+    {
         println!("{label}: {}", ms(per_op));
     }
     println!("== enclave check throughput (in-process, Pay, mock attestation)");
@@ -114,6 +119,11 @@ fn sync_benches(args: &Args, root: &Path) -> Result<()> {
     println!(
         "{}",
         rate_line("append with fsync per op", args.appends, elapsed)
+    );
+    let replay = evidence::replay_per_entry(&root.join(store::PER_OP_DIR), args.appends)?;
+    println!(
+        "startup replay (parse, trailer hash, chain link, receipt verify) per entry: {}",
+        ms(replay)
     );
     Ok(())
 }
@@ -170,6 +180,14 @@ async fn loopback_benches(args: &Args, root: &Path) -> Result<()> {
     print_percentiles("verify attestation bundle", &cost.verify);
     print_percentiles("seal payer opening", &cost.seal);
     print_percentiles("build offer (prepare_pay)", &cost.offer);
+    print_percentiles(
+        &format!(
+            "prove-payment over a {}-entry log (chain check, walk, proof)",
+            cost.log_entries
+        ),
+        &cost.prove,
+    );
+    print_percentiles("verify-proof (payee mode)", &cost.verify_proof);
     drop(lb);
     println!("== message sizes");
     let lb = setup::start_loopback(root, "sizes").await?;
