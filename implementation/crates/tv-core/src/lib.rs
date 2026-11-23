@@ -12,7 +12,10 @@ pub mod types;
 pub mod wire;
 
 pub use cbor::{decode_cbor, encode_cbor};
-pub use commit::{commitment, enroll_digest, manifest_digest, pay_digest, refresh_digest};
+pub use commit::{
+    amount_commitment, commitment, context_hash, enroll_digest, manifest_digest, pay_digest,
+    refresh_digest,
+};
 pub use derive::{Seed, derive_r, derive_sk};
 pub use error::CoreError;
 pub use result::{EnclaveResult, sign_result, verify_result, verify_result_with};
@@ -49,6 +52,10 @@ pub const DOMAIN_REFRESH: &[u8] = b"tv/v1/refresh";
 pub const DOMAIN_ENROLL: &[u8] = b"tv/v1/enroll";
 pub const DOMAIN_RESULT: &[u8] = b"tv/v1/result/ok";
 pub const DOMAIN_MANIFEST: &[u8] = b"tv/v1/manifest";
+pub const DOMAIN_AMT: &[u8] = b"tv/v1/amt";
+pub const DOMAIN_CTX: &[u8] = b"tv/v1/ctx";
+
+pub const MAX_MEMO_LEN: usize = 1024;
 
 #[cfg(test)]
 mod tests {
@@ -64,6 +71,8 @@ mod tests {
             DOMAIN_ENROLL,
             DOMAIN_RESULT,
             DOMAIN_MANIFEST,
+            DOMAIN_AMT,
+            DOMAIN_CTX,
         ];
         for (i, a) in domains.iter().enumerate() {
             for (j, b) in domains.iter().enumerate() {

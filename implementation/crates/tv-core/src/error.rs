@@ -10,4 +10,6 @@ pub enum CoreError {
     BadSignature,
     #[error("key derivation failed")]
     Derivation,
+    #[error("memo of {len} bytes exceeds the limit of {max}")]
+    MemoTooLong { len: usize, max: usize },
 }
