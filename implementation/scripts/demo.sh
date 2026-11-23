@@ -15,10 +15,23 @@ echo "== issue 500 to alice"
 issue_to alice 500
 
 echo "== alice pays bob 120"
-cli bob request --amount 120 --out "${DATA}/req-pay.json"
+cli bob request --amount 120 --memo "invoice 42" --out "${DATA}/req-pay.json"
 cli alice pay --request "${DATA}/req-pay.json" --amount 120 --out "${DATA}/offer-pay.json"
 cli bob receive --offer "${DATA}/offer-pay.json" --out "${DATA}/receipt-pay.json"
 cli alice finish --receipt "${DATA}/receipt-pay.json"
+
+echo "== alice proves she paid, bob proves to alice alone that he received"
+SEQ="$(sed -n 's/^ *"seq": \([0-9]*\),$/\1/p' "${DATA}/receipt-pay.json" | head -1)"
+cli alice prove-payment --seq "${SEQ}" --mode payer --challenge "$(printf '11%.0s' {1..32})" --out "${DATA}/proof-payer.json"
+cli bob verify-proof --proof "${DATA}/proof-payer.json" --challenge "$(printf '11%.0s' {1..32})"
+VERIFIER="$(cli alice verifier-key)"
+VERIFIER_SK="$(sed -n 's/^verifier_sk=//p' <<<"${VERIFIER}")"
+VERIFIER_PK="$(sed -n 's/^verifier_pk=//p' <<<"${VERIFIER}")"
+cli bob prove-payment --seq "${SEQ}" --mode designated --verifier-pk "${VERIFIER_PK}" --challenge "$(printf '22%.0s' {1..32})" --out "${DATA}/proof-payee.json"
+cli alice verify-proof --proof "${DATA}/proof-payee.json" --challenge "$(printf '22%.0s' {1..32})" --verifier-sk "${VERIFIER_SK}"
+
+echo "== the auditor replays the log"
+"${BIN}/tv-bank" verify-log --data "${BANK_DATA}"
 
 echo "== bob refreshes"
 cli bob refresh
