@@ -6,8 +6,9 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 use tv_client::error::describe;
 use tv_client::ops::{Session, balance, create_wallet, seed_hex};
+use tv_client::proof::Mode;
 use tv_client::{DEFAULT_BANK, Trust, parse_pcr0};
-use tv_core::{BankKeys, Bytes32, Seed, VerifyingKey};
+use tv_core::{BankKeys, Bytes32, Seed, SigningKey, VerifyingKey};
 
 const DEFAULT_LOG_FILTER: &str = "warn";
 
@@ -45,6 +46,42 @@ struct Cli {
     pcr0: Option<String>,
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Debug, clap::Args)]
+struct ProveArgs {
+    #[arg(long, help = "Position of the payment in the public log")]
+    seq: u64,
+    #[arg(long, value_parser = ["payer", "payee", "amount", "designated"], help = "What to prove")]
+    mode: String,
+    #[arg(
+        long,
+        value_name = "HEX",
+        help = "Verifier public key (designated mode)"
+    )]
+    verifier_pk: Option<String>,
+    #[arg(
+        long,
+        value_name = "HEX",
+        help = "32-byte challenge chosen by the verifier"
+    )]
+    challenge: String,
+    #[arg(long, help = "Where to write proof.json")]
+    out: PathBuf,
+}
+
+#[derive(Debug, clap::Args)]
+struct VerifyArgs {
+    #[arg(long, help = "The prover's proof.json")]
+    proof: PathBuf,
+    #[arg(long, value_name = "HEX", help = "The challenge this verifier chose")]
+    challenge: String,
+    #[arg(
+        long,
+        value_name = "HEX",
+        help = "Verifier secret key (designated proofs)"
+    )]
+    verifier_sk: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -154,13 +191,36 @@ enum Command {
     Balance,
     #[command(about = "Rebuild index and state from the public log using the seed alone")]
     Recover,
+    #[command(about = "Prove one payment of this wallet from its seed and a full log download")]
+    ProvePayment(ProveArgs),
+    #[command(about = "Verify a proof of payment against the bank keys pinned in this wallet")]
+    VerifyProof(VerifyArgs),
+    #[command(about = "Print a fresh verifier key pair for designated proofs")]
+    VerifierKey,
+}
+
+fn parse_hex32(text: &str, what: &str) -> anyhow::Result<Bytes32> {
+    let bytes = hex::decode(text.trim()).with_context(|| format!("{what} is not hex"))?;
+    bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("{what} is not 32 bytes"))
+}
+
+fn parse_mode(mode: &str, verifier_pk: Option<&str>) -> anyhow::Result<Mode> {
+    Ok(match (mode, verifier_pk) {
+        ("payer", None) => Mode::Payer,
+        ("payee", None) => Mode::Payee,
+        ("amount", None) => Mode::Amount,
+        ("designated", Some(pk)) => Mode::Designated {
+            verifier_pk: parse_pk(pk, "--verifier-pk")?,
+        },
+        ("designated", None) => anyhow::bail!("--mode designated needs --verifier-pk"),
+        _ => anyhow::bail!("--verifier-pk is only for --mode designated"),
+    })
 }
 
 fn parse_pk(hex_pk: &str, what: &str) -> anyhow::Result<Bytes32> {
-    let bytes = hex::decode(hex_pk.trim()).with_context(|| format!("{what} is not hex"))?;
-    let pk: Bytes32 = bytes
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("{what} is not 32 bytes"))?;
+    let pk = parse_hex32(hex_pk, what)?;
     let key = VerifyingKey::parse(&pk).with_context(|| format!("{what} is not a curve point"))?;
     anyhow::ensure!(
         !key.is_weak(),
@@ -177,6 +237,33 @@ fn init_logging() {
         .with_ansi(std::io::stderr().is_terminal())
         .with_writer(std::io::stderr)
         .init();
+}
+
+async fn prove(session: &Session, args: &ProveArgs) -> anyhow::Result<String> {
+    let mode = parse_mode(&args.mode, args.verifier_pk.as_deref())?;
+    let challenge = parse_hex32(&args.challenge, "--challenge")?;
+    Ok(session
+        .prove_payment(args.seq, mode, challenge, &args.out)
+        .await?)
+}
+
+fn verify(session: &Session, args: &VerifyArgs) -> anyhow::Result<String> {
+    let challenge = parse_hex32(&args.challenge, "--challenge")?;
+    let verifier = args
+        .verifier_sk
+        .as_deref()
+        .map(|sk| parse_hex32(sk, "--verifier-sk").map(|b| SigningKey::from_bytes(&b)))
+        .transpose()?;
+    Ok(session.verify_payment(&args.proof, &challenge, verifier.as_ref())?)
+}
+
+fn verifier_key() -> String {
+    let key = SigningKey::generate();
+    format!(
+        "verifier_sk={}\nverifier_pk={}",
+        hex::encode(key.to_bytes()),
+        hex::encode(key.public_key())
+    )
 }
 
 async fn run(cli: Cli) -> anyhow::Result<String> {
@@ -221,6 +308,9 @@ async fn run(cli: Cli) -> anyhow::Result<String> {
         Command::Finish { receipt } => session()?.finish(receipt.as_deref()).await?,
         Command::Refresh { force } => session()?.refresh(force).await?,
         Command::Recover => session()?.recover().await?,
+        Command::ProvePayment(args) => prove(&session()?, &args).await?,
+        Command::VerifyProof(args) => verify(&session()?, &args)?,
+        Command::VerifierKey => verifier_key(),
     })
 }
 

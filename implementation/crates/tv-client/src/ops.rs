@@ -83,6 +83,10 @@ impl Session {
         &self.bank
     }
 
+    pub fn wallet_path(&self) -> &Path {
+        &self.wallet_path
+    }
+
     fn wallet(&self) -> Result<Wallet, ClientError> {
         Wallet::load(&self.wallet_path)
     }

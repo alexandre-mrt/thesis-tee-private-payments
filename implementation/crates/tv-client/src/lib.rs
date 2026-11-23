@@ -8,6 +8,7 @@ pub mod files;
 pub mod flows;
 pub mod ops;
 pub mod payment;
+pub mod proof;
 pub mod recover;
 pub mod retry;
 pub mod wallet;

@@ -88,14 +88,29 @@ fn by_serial(log: &[LogEntry]) -> BTreeMap<Bytes32, &LogEntry> {
     map
 }
 
-fn walk(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Step {
+    pub index: u64,
+    pub seq: u64,
+    pub before: u64,
+    pub after: u64,
+}
+
+pub struct Walk {
+    pub index: u64,
+    pub state: Option<SignedState>,
+    pub steps: Vec<Step>,
+}
+
+pub fn walk(
     wallet: &Wallet,
     log: &[LogEntry],
     mut state: Option<SignedState>,
     debits: &Debits,
-) -> Result<(u64, Option<SignedState>), ClientError> {
+) -> Result<Walk, ClientError> {
     let spending = by_serial(log);
     let mut index = 0u64;
+    let mut steps = Vec::new();
     loop {
         let pk = wallet.key_at(index)?.public_key();
         let Some(entry) = spending.get(&pk) else {
@@ -110,12 +125,23 @@ fn walk(
             }
             OpKind::Pay | OpKind::Refresh => {
                 let previous = state.map_or(0, |s| s.state.balance);
-                state = Some(step(wallet, index, previous, debits, entry)?);
+                let next = step(wallet, index, previous, debits, entry)?;
+                steps.push(Step {
+                    index,
+                    seq: entry.seq,
+                    before: previous,
+                    after: next.state.balance,
+                });
+                state = Some(next);
                 index += 1;
             }
         }
     }
-    Ok((index, state))
+    Ok(Walk {
+        index,
+        state,
+        steps,
+    })
 }
 
 pub fn verify_chain(wallet: &Wallet, log: &[LogEntry]) -> Result<Option<ChainHead>, ClientError> {
@@ -154,12 +180,12 @@ fn restore_verified(
     debits: &Debits,
 ) -> Result<u64, ClientError> {
     let head = verify_chain(wallet, log)?;
-    let (index, state) = walk(wallet, log, genesis, debits)?;
+    let walked = walk(wallet, log, genesis, debits)?;
     if let Some(head) = head {
         wallet.see_head(head);
     }
-    wallet.restore(index, state)?;
-    Ok(index)
+    wallet.restore(walked.index, walked.state)?;
+    Ok(walked.index)
 }
 
 pub async fn recover(wallet: &mut Wallet, bank: &BankClient) -> Result<u64, ClientError> {

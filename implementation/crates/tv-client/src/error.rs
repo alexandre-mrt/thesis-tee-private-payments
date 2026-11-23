@@ -122,6 +122,8 @@ pub enum ClientError {
         "the log served now does not hold the chain head this wallet saw at entry {seq}: the bank forked its log"
     )]
     ChainMismatch { seq: u64 },
+    #[error("cannot prove this payment: {reason}")]
+    Prove { reason: &'static str },
     #[error("the bank's receipt does not verify: {what}")]
     BadReceipt { what: &'static str },
     #[error("the offer's {what} does not match this request; nothing was signed")]
