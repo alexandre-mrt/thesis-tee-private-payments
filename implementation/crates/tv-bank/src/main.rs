@@ -11,12 +11,12 @@ use tracing_subscriber::EnvFilter;
 use tv_bank::{
     Bank, DEFAULT_ENCLAVE, DEFAULT_LISTEN, DEFAULT_RESERVE, EnclaveTrust, Policy, ServerConfig,
     TcpLink, audit_entries, bank_wallet_path, bind, crash_after_append, exit_after_append_hook,
-    init, issue, parse_enclave, read_log_entries, serve,
+    init, issue, parse_enclave, read_log_entries, read_receipt_pk, serve,
 };
 use tv_client::error::describe;
 use tv_client::ops::{Session, balance};
 use tv_client::{Trust, parse_pcr0};
-use tv_core::{BankKeys, BankRequest, BankResponse};
+use tv_core::{BankRequest, BankResponse};
 
 const SERVE_LOG_FILTER: &str = "info";
 const COMMAND_LOG_FILTER: &str = "warn";
@@ -74,7 +74,7 @@ impl WalletArgs {
 #[derive(Debug, Subcommand)]
 enum Command {
     #[command(
-        about = "Generate the state and issuance keys and the bank wallet; prints state_pk=HEX and issuance_pk=HEX"
+        about = "Generate the state, issuance and receipt keys and the bank wallet; prints state_pk=HEX, issuance_pk=HEX and receipt_pk=HEX"
     )]
     Init {
         #[arg(long, help = "Bank data directory to create")]
@@ -271,19 +271,19 @@ fn verify_log(data: &Path) -> anyhow::Result<String> {
     ))
 }
 
-fn describe_keys(keys: &BankKeys) -> String {
-    format!(
-        "state_pk={}\nissuance_pk={}",
+fn init_and_describe(data: &Path, reserve: u64) -> anyhow::Result<String> {
+    let keys = init(data, reserve).context("initializing the bank")?;
+    Ok(format!(
+        "state_pk={}\nissuance_pk={}\nreceipt_pk={}",
         hex::encode(keys.state_pk),
-        hex::encode(keys.issuance_pk)
-    )
+        hex::encode(keys.issuance_pk),
+        hex::encode(read_receipt_pk(data)?)
+    ))
 }
 
 async fn run(cli: Cli) -> anyhow::Result<Option<String>> {
     Ok(match cli.command {
-        Command::Init { data, reserve } => Some(describe_keys(
-            &init(&data, reserve).context("initializing the bank")?,
-        )),
+        Command::Init { data, reserve } => Some(init_and_describe(&data, reserve)?),
         Command::Serve {
             data,
             listen,

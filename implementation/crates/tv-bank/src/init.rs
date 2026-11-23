@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use tracing::warn;
 use tv_client::{Wallet, WalletData};
-use tv_core::{BankKeys, Seed, SignedState, SigningKey, State, derive_r, derive_sk, sign_state};
+use tv_core::{
+    BankKeys, Bytes32, Seed, SignedState, SigningKey, State, derive_r, derive_sk, sign_state,
+};
 
 use crate::error::BankError;
 use crate::genesis::write_genesis;
@@ -12,13 +14,15 @@ use crate::keys::{read_key, write_key};
 
 pub const STATE_KEY_FILE: &str = "state.key";
 pub const ISSUANCE_KEY_FILE: &str = "issuance.key";
+pub const RECEIPT_KEY_FILE: &str = "receipt.key";
 pub const ENCLAVE_PK_FILE: &str = "enclave.pk";
 pub const BANK_WALLET_FILE: &str = "bank-wallet.json";
 pub const DEFAULT_RESERVE: u64 = 1_000_000_000;
 
-const REQUIRED_FILES: [&str; 4] = [
+const REQUIRED_FILES: [&str; 5] = [
     STATE_KEY_FILE,
     ISSUANCE_KEY_FILE,
+    RECEIPT_KEY_FILE,
     BANK_WALLET_FILE,
     LOG_FILE,
 ];
@@ -48,8 +52,10 @@ fn sync_dir(dir: &Path) -> Result<(), BankError> {
 fn populate(dir: &Path, reserve: u64) -> Result<BankKeys, BankError> {
     let state_key = SigningKey::generate();
     let issuance_key = SigningKey::generate();
+    let receipt_key = SigningKey::generate();
     write_key(&dir.join(STATE_KEY_FILE), &state_key)?;
     write_key(&dir.join(ISSUANCE_KEY_FILE), &issuance_key)?;
+    write_key(&dir.join(RECEIPT_KEY_FILE), &receipt_key)?;
     let keys = BankKeys {
         state_pk: state_key.public_key(),
         issuance_pk: issuance_key.public_key(),
@@ -108,6 +114,10 @@ pub fn require_complete(dir: &Path) -> Result<(), BankError> {
         }),
         None => Ok(()),
     }
+}
+
+pub fn read_receipt_pk(dir: &Path) -> Result<Bytes32, BankError> {
+    Ok(read_key(&dir.join(RECEIPT_KEY_FILE))?.public_key())
 }
 
 pub fn read_keys(dir: &Path) -> Result<BankKeys, BankError> {
