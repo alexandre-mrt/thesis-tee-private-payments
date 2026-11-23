@@ -43,6 +43,7 @@ pub fn entry_hash(entry: &LogEntry) -> Bytes32 {
     h.update(DOMAIN_ENTRY);
     h.update(entry.seq.to_be_bytes());
     h.update([kind_byte(entry.kind)]);
+    h.update(entry.epoch.to_be_bytes());
     hash_list(&mut h, &entry.serials);
     hash_list(&mut h, &entry.commitments);
     hash_sigs(&mut h, &entry.sigs);
@@ -93,6 +94,9 @@ mod tests {
             digest: [9u8; 32],
             c_v: Some([10u8; 32]),
             h_ctx: Some([11u8; 32]),
+            epoch: 12,
+            chain: [13u8; 32],
+            rcpt: Signature([14u8; 64]),
         }
     }
 
@@ -101,6 +105,10 @@ mod tests {
         let base = entry_hash(&entry());
         let variants = [
             LogEntry { seq: 5, ..entry() },
+            LogEntry {
+                epoch: 13,
+                ..entry()
+            },
             LogEntry {
                 kind: OpKind::Refresh,
                 ..entry()
@@ -136,7 +144,12 @@ mod tests {
         for variant in &variants {
             assert_ne!(entry_hash(variant), base, "{variant:?}");
         }
-        assert_eq!(entry_hash(&entry()), base);
+        let resealed = LogEntry {
+            chain: [0u8; 32],
+            rcpt: Signature([0u8; 64]),
+            ..entry()
+        };
+        assert_eq!(entry_hash(&resealed), base);
     }
 
     #[test]

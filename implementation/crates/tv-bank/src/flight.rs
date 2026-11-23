@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use tv_core::LogEntry;
+use tv_core::{Bytes32, LogEntry, VerifyingKey};
 
 use crate::error::BankError;
 use crate::index::Index;
@@ -27,8 +27,46 @@ impl Frame {
 
 pub const LOG_FORMAT: &str = "flights";
 
-pub fn header() -> Vec<u8> {
-    format!("{{\"log\":\"{LOG_FORMAT}\"}}\n").into_bytes()
+pub const LOG_VERSION: u32 = 2;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Header {
+    log: String,
+    v: u32,
+    receipt_pk: String,
+}
+
+pub fn header(receipt_pk: &Bytes32) -> Vec<u8> {
+    format!(
+        "{{\"log\":\"{LOG_FORMAT}\",\"v\":{LOG_VERSION},\"receipt_pk\":\"{}\"}}\n",
+        hex::encode(receipt_pk)
+    )
+    .into_bytes()
+}
+
+fn parse_header(bytes: &[u8]) -> Option<(Bytes32, usize)> {
+    let end = bytes.iter().position(|b| *b == b'\n')?;
+    let parsed: Header = serde_json::from_slice(&bytes[..end]).ok()?;
+    if parsed.log != LOG_FORMAT || parsed.v != LOG_VERSION {
+        return None;
+    }
+    let pk: Bytes32 = hex::decode(&parsed.receipt_pk).ok()?.try_into().ok()?;
+    (bytes[..=end] == header(&pk)[..]).then_some((pk, end + 1))
+}
+
+struct Chain {
+    key: VerifyingKey,
+}
+
+impl Chain {
+    fn admit(&self, index: &mut Index, entry: LogEntry, line: usize) -> Result<(), BankError> {
+        entry
+            .verify_link(&index.head())
+            .and_then(|()| entry.verify_receipt(&self.key))
+            .map_err(|err| corrupt(line, &format!("entry {}: {err}", entry.seq)))?;
+        index.apply(entry)
+    }
 }
 
 pub fn trailer(lines: &[u8]) -> Vec<u8> {
@@ -146,13 +184,18 @@ impl Tail {
 }
 
 pub fn replay(bytes: &[u8]) -> Result<(Index, usize), BankError> {
-    let head = header();
-    if !bytes.starts_with(&head) {
-        return Err(corrupt(0, "log header missing or damaged"));
-    }
-    let mut index = Index::default();
-    let mut tail = Tail::at(head.len());
-    let mut start = head.len();
+    let Some((receipt_pk, head_len)) = parse_header(bytes) else {
+        return Err(corrupt(
+            0,
+            "log header missing, damaged or of another version",
+        ));
+    };
+    let chain = Chain {
+        key: VerifyingKey::parse(&receipt_pk)?,
+    };
+    let mut index = Index::new(receipt_pk);
+    let mut tail = Tail::at(head_len);
+    let mut start = head_len;
     for (line, raw) in bytes[start..].split(|b| *b == b'\n').enumerate() {
         let line = line + 1;
         let end = start + raw.len() + 1;
@@ -165,7 +208,7 @@ pub fn replay(bytes: &[u8]) -> Result<(Index, usize), BankError> {
                 Some(sealed) => {
                     let flight = std::mem::replace(&mut tail, Tail::at(end));
                     for entry in flight.seal(sealed, line)? {
-                        index.apply(entry)?;
+                        chain.admit(&mut index, entry, line)?;
                     }
                 }
                 None => tail.note(line, Line::Trailer(frame)),

@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use serde::de::DeserializeOwned;
+use tv_core::Bytes32;
 
 use crate::error::BankError;
 use crate::flight::header;
@@ -39,14 +40,14 @@ impl LogWriter for File {
 
 pub type Journal<W> = Arc<Mutex<W>>;
 
-pub fn create_log(dir: &Path) -> Result<(), BankError> {
+pub fn create_log(dir: &Path, receipt_pk: &Bytes32) -> Result<(), BankError> {
     let path = dir.join(LOG_FILE);
     OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&path)
         .and_then(|mut file| {
-            file.write_all(&header())?;
+            file.write_all(&header(receipt_pk))?;
             file.sync_all()
         })
         .and_then(|()| File::open(dir)?.sync_all())
@@ -100,7 +101,7 @@ pub(crate) mod testing {
     use std::path::{Path, PathBuf};
     use std::sync::PoisonError;
 
-    use tv_core::{LogEntry, OpKind, Signature};
+    use tv_core::{LogEntry, OpKind, Signature, SigningKey};
 
     use super::{LOG_FILE, LogWriter};
     use crate::store::Store;
@@ -113,6 +114,19 @@ pub(crate) mod testing {
         let dir = std::env::temp_dir().join(format!("tv-store-{tag}-{nanos}"));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    pub fn receipt_key() -> SigningKey {
+        SigningKey::from_bytes(&[42u8; 32])
+    }
+
+    pub fn write_test_key(dir: &Path) {
+        crate::keys::write_key(&dir.join(crate::init::RECEIPT_KEY_FILE), &receipt_key()).unwrap();
+    }
+
+    pub fn create_test_log(dir: &Path) {
+        write_test_key(dir);
+        super::create_log(dir, &receipt_key().public_key()).unwrap();
     }
 
     pub fn entry(seq: u64, kind: OpKind, serial: u8) -> LogEntry {
@@ -130,6 +144,9 @@ pub(crate) mod testing {
             digest: [seq as u8 + 50; 32],
             c_v: None,
             h_ctx: None,
+            epoch: 0,
+            chain: [0u8; 32],
+            rcpt: Signature([0u8; 64]),
         }
     }
 
@@ -170,18 +187,21 @@ pub(crate) mod testing {
 
     pub fn faulty(dir: &Path, fault: Fault) -> Store<FaultyWriter> {
         if !dir.join(LOG_FILE).exists() {
-            super::create_log(dir).unwrap();
+            create_test_log(dir);
         }
         let file = OpenOptions::new()
             .read(true)
             .append(true)
             .open(dir.join(LOG_FILE))
             .unwrap();
-        Store::from_writer(FaultyWriter {
-            file,
-            fault,
-            appends: 0,
-        })
+        Store::from_writer(
+            FaultyWriter {
+                file,
+                fault,
+                appends: 0,
+            },
+            crate::keys::read_key(&dir.join(crate::init::RECEIPT_KEY_FILE)).unwrap(),
+        )
         .unwrap()
     }
 

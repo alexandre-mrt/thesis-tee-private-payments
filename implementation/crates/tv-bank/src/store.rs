@@ -3,14 +3,16 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tracing::{error, warn};
-use tv_core::{BankResponse, Bytes32, LogEntry};
+use tv_core::{BankResponse, Bytes32, LogEntry, SigningKey};
 
 use crate::error::BankError;
 use crate::flight::{replay, trailer};
 use crate::index::Index;
 pub use crate::index::{MAX_RANGE, answer_for};
+use crate::init::RECEIPT_KEY_FILE;
 use crate::journal::{Journal, open_log};
 pub use crate::journal::{LOG_FILE, LogWriter, create_log};
+use crate::keys::read_key;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ticket {
@@ -31,6 +33,7 @@ pub struct Flight {
 }
 
 pub struct Store<W: LogWriter = File> {
+    receipt_key: SigningKey,
     journal: Journal<W>,
     index: Index,
     len: u64,
@@ -44,14 +47,18 @@ pub struct Store<W: LogWriter = File> {
 
 impl Store<File> {
     pub fn open(dir: &Path) -> Result<Self, BankError> {
-        Self::from_writer(open_log(dir)?)
+        let log = open_log(dir)?;
+        Self::from_writer(log, read_key(&dir.join(RECEIPT_KEY_FILE))?)
     }
 }
 
 impl<W: LogWriter> Store<W> {
-    pub fn from_writer(mut writer: W) -> Result<Self, BankError> {
+    pub fn from_writer(mut writer: W, receipt_key: SigningKey) -> Result<Self, BankError> {
         let bytes = writer.read_all()?;
         let (index, consumed) = replay(&bytes)?;
+        if index.receipt_pk() != receipt_key.public_key() {
+            return Err(BankError::ReceiptKeyMismatch);
+        }
         if consumed < bytes.len() {
             warn!(
                 dropped = bytes.len() - consumed,
@@ -61,6 +68,7 @@ impl<W: LogWriter> Store<W> {
         }
         let durable = index.entries().len();
         Ok(Self {
+            receipt_key,
             journal: Arc::new(Mutex::new(writer)),
             index,
             len: consumed as u64,
@@ -129,6 +137,7 @@ impl<W: LogWriter> Store<W> {
 
     pub fn stage(&mut self, entry: LogEntry) -> Result<Ticket, BankError> {
         self.healthy()?;
+        let entry = entry.sealed(&self.index.head(), &self.receipt_key);
         let mut line = serde_json::to_vec(&entry)?;
         line.push(b'\n');
         let seq = self.index.entries().len();
@@ -226,13 +235,16 @@ mod tests {
     use tv_core::{OpKind, Signature};
 
     use super::*;
-    use crate::journal::testing::{Fault, entry, faulty, set_fault, temp_dir};
+    use crate::journal::testing::{Fault, create_test_log, entry, faulty, set_fault, temp_dir};
 
     #[test]
     fn append_replay_torn_tail_and_lock() {
         let dir = temp_dir("replay");
-        create_log(&dir).unwrap();
-        assert!(matches!(create_log(&dir), Err(BankError::File { .. })));
+        create_test_log(&dir);
+        assert!(matches!(
+            create_log(&dir, &[1u8; 32]),
+            Err(BankError::File { .. })
+        ));
         let mut store = Store::open(&dir).unwrap();
         assert!(store.index().is_empty());
         store.append(entry(0, OpKind::Enroll, 1)).unwrap();

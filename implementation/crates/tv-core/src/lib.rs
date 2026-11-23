@@ -9,6 +9,7 @@ pub mod entry;
 pub mod error;
 pub mod evidence;
 pub mod pair;
+pub mod receipt;
 pub mod result;
 pub mod sig;
 pub mod types;
@@ -24,6 +25,7 @@ pub use entry::LogEntry;
 pub use error::CoreError;
 pub use evidence::{chain_genesis, chain_next, entry_hash, receipt_digest};
 pub use pair::{PairSecret, designated_key};
+pub use receipt::{Receipt, epoch_of, is_fork};
 pub use result::{EnclaveResult, sign_result, verify_result, verify_result_with};
 pub use sig::{
     BankVerifiers, SIG_LEN, Signature, SigningKey, VerifyingKey, sign_digest, sign_state,
@@ -69,6 +71,8 @@ pub const DOMAIN_CHAIN0: &[u8] = b"tv/v1/chain/0";
 pub const DOMAIN_RCPT: &[u8] = b"tv/v1/rcpt";
 
 pub const MAX_MEMO_LEN: usize = 1024;
+
+pub const EPOCH_SECS: u64 = 3600;
 
 #[cfg(test)]
 mod tests {

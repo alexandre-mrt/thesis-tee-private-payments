@@ -1,6 +1,9 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use tracing::{info, warn};
 use tv_core::{
-    BankResponse, Bytes32, LogEntry, OpKind, SideKind, Signature, SigningKey, sign_state,
+    BankResponse, Bytes32, LogEntry, OpKind, SIG_LEN, SideKind, Signature, SigningKey, epoch_of,
+    sign_state,
 };
 
 use super::{Bank, Outcome};
@@ -16,6 +19,13 @@ pub(crate) struct Settlement {
     pub owner_sigs: Vec<Signature>,
     pub digest: Bytes32,
     pub evidence: Option<(Bytes32, Bytes32)>,
+}
+
+fn current_epoch() -> Result<u64, &'static str> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| "clock before the Unix epoch")?;
+    Ok(epoch_of(now.as_secs()))
 }
 
 impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
@@ -70,6 +80,7 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
         if consumed || reused {
             return Err("serial or commitment consumed concurrently");
         }
+        let digest = s.digest;
         let entry = LogEntry {
             seq: store.index().len(),
             kind: s.kind,
@@ -80,14 +91,18 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
             digest: s.digest,
             c_v: s.evidence.map(|(c_v, _)| c_v),
             h_ctx: s.evidence.map(|(_, h_ctx)| h_ctx),
+            epoch: current_epoch()?,
+            chain: [0u8; 32],
+            rcpt: Signature([0u8; SIG_LEN]),
         };
-        let Some(response) = answer_for(&entry) else {
+        if answer_for(&entry).is_none() {
             return Err("entry shape");
-        };
-        let ticket = store.stage(entry).map_err(|err| {
+        }
+        store.stage(entry).map_err(|err| {
             warn!(error = %err, "stage failed; the operation is not settled");
             "storage"
         })?;
+        let (ticket, response) = store.answer(&digest).ok_or("staged entry")?;
         Ok((ticket, response, true))
     }
 }

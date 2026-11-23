@@ -1,14 +1,26 @@
-use tv_core::OpKind;
+use tv_core::{OpKind, chain_genesis};
 
 use super::*;
 use crate::journal::LOG_FILE;
-use crate::journal::testing::{entry, temp_dir};
+use crate::journal::testing::{create_test_log, entry, receipt_key, temp_dir, write_test_key};
 use crate::store::Store;
 
 const PAGE: usize = 4096;
 
+fn head() -> Vec<u8> {
+    header(&receipt_key().public_key())
+}
+
+fn sealed(seq: u64, serial: u8) -> LogEntry {
+    let key = receipt_key();
+    let prev = (0..seq).fold(chain_genesis(&key.public_key()), |prev, i| {
+        entry(i, OpKind::Pay, i as u8 + 1).sealed(&prev, &key).chain
+    });
+    entry(seq, OpKind::Pay, seq as u8 + serial).sealed(&prev, &key)
+}
+
 fn line(seq: u64, serial: u8) -> Vec<u8> {
-    let mut line = serde_json::to_vec(&entry(seq, OpKind::Pay, seq as u8 + serial)).unwrap();
+    let mut line = serde_json::to_vec(&sealed(seq, serial)).unwrap();
     line.push(b'\n');
     line
 }
@@ -20,7 +32,7 @@ fn flight(lines: &[Vec<u8>]) -> Vec<u8> {
 
 fn single_flights(count: u64) -> Vec<u8> {
     let flights = (0..count).flat_map(|seq| flight(&[line(seq, 1)]));
-    header().into_iter().chain(flights).collect()
+    head().into_iter().chain(flights).collect()
 }
 
 fn torn_two_entry_flight() -> (Vec<u8>, Vec<u8>, u64) {
@@ -39,6 +51,7 @@ fn torn_two_entry_flight() -> (Vec<u8>, Vec<u8>, u64) {
 
 fn open_bytes(tag: &str, bytes: &[u8]) -> (usize, u64) {
     let dir = temp_dir(tag);
+    write_test_key(&dir);
     std::fs::write(dir.join(LOG_FILE), bytes).unwrap();
     let entries = Store::open(&dir).unwrap().entries().len();
     let len = std::fs::metadata(dir.join(LOG_FILE)).unwrap().len();
@@ -94,7 +107,7 @@ fn zeros_before_a_valid_trailer_are_fatal() {
         Err(BankError::Corrupt { .. })
     ));
     let mut zeroed_first = single_flights(3);
-    zeroed_first[header().len()..header().len() + 8].fill(0);
+    zeroed_first[head().len()..head().len() + 8].fill(0);
     assert!(matches!(
         replay(&zeroed_first),
         Err(BankError::Corrupt { line: 1, .. })
@@ -129,15 +142,15 @@ fn damage_without_zero_bytes_is_fatal() {
 
 #[test]
 fn entries_without_a_trailer_are_fatal_unless_torn() {
-    let flights = single_flights(2)[header().len()..].to_vec();
-    let unframed = [header(), line(0, 1), line(1, 1), flights.clone()].concat();
+    let flights = single_flights(2)[head().len()..].to_vec();
+    let unframed = [head(), line(0, 1), line(1, 1), flights.clone()].concat();
     assert!(matches!(
         replay(&unframed),
         Err(BankError::Corrupt { line: 1, .. })
     ));
-    let missing_trailer = [header(), line(0, 1), flights].concat();
+    let missing_trailer = [head(), line(0, 1), flights].concat();
     assert!(replay(&missing_trailer).is_err());
-    let headed_legacy = [header(), line(0, 1)].concat();
+    let headed_legacy = [head(), line(0, 1)].concat();
     assert!(replay(&headed_legacy).is_ok());
     let gap_after = [single_flights(2), line(3, 1)].concat();
     assert!(matches!(
@@ -149,7 +162,7 @@ fn entries_without_a_trailer_are_fatal_unless_torn() {
         replay(&repeat_after),
         Err(BankError::Corrupt { line: 5, .. })
     ));
-    let late_header = [single_flights(2), header(), line(2, 1)].concat();
+    let late_header = [single_flights(2), head(), line(2, 1)].concat();
     assert!(matches!(
         replay(&late_header),
         Err(BankError::Corrupt { line: 5, .. })
@@ -167,23 +180,24 @@ fn a_final_flight_cut_at_a_newline_before_its_trailer_is_dropped() {
         let (entries, len) = open_bytes("cut-at-newline", torn);
         assert_eq!((entries, len), (3, good.len() as u64));
     }
-    let first_flight = [header(), line(0, 1), line(1, 1)].concat();
+    let first_flight = [head(), line(0, 1), line(1, 1)].concat();
     let (index, consumed) = replay(&first_flight).unwrap();
-    assert_eq!((index.len(), consumed), (0, header().len()));
+    assert_eq!((index.len(), consumed), (0, head().len()));
 }
 
 #[test]
 fn a_fresh_log_holds_only_its_header_and_a_cut_first_flight_reopens() {
     let dir = temp_dir("fresh-header");
-    crate::journal::create_log(&dir).unwrap();
+    create_test_log(&dir);
     let path = dir.join(LOG_FILE);
-    assert_eq!(std::fs::read(&path).unwrap(), header());
+    assert_eq!(std::fs::read(&path).unwrap(), head());
     let mut store = Store::open(&dir).unwrap();
     store.append(entry(0, OpKind::Enroll, 1)).unwrap();
     store.append(entry(1, OpKind::Pay, 2)).unwrap();
+    let appended = store.entries()[1].clone();
     drop(store);
     let full = std::fs::read(&path).unwrap();
-    let mut last = serde_json::to_vec(&entry(1, OpKind::Pay, 2)).unwrap();
+    let mut last = serde_json::to_vec(&appended).unwrap();
     last.push(b'\n');
     let cut = full.len() - trailer(&last).len();
     std::fs::write(&path, &full[..cut]).unwrap();
@@ -195,8 +209,8 @@ fn a_fresh_log_holds_only_its_header_and_a_cut_first_flight_reopens() {
 
 #[test]
 fn a_log_without_its_whole_header_is_refused_and_never_truncated() {
-    let flights = single_flights(2)[header().len()..].to_vec();
-    let unterminated = header()[..header().len() - 1].to_vec();
+    let flights = single_flights(2)[head().len()..].to_vec();
+    let unterminated = head()[..head().len() - 1].to_vec();
     for damaged in [
         Vec::new(),
         b"{\"log\":\"fl".to_vec(),
@@ -209,6 +223,7 @@ fn a_log_without_its_whole_header_is_refused_and_never_truncated() {
             Err(BankError::Corrupt { line: 0, .. })
         ));
         let dir = temp_dir("headerless");
+        write_test_key(&dir);
         let path = dir.join(LOG_FILE);
         std::fs::write(&path, &damaged).unwrap();
         assert!(Store::open(&dir).is_err());

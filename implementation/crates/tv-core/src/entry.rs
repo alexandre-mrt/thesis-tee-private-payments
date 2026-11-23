@@ -17,6 +17,9 @@ pub struct LogEntry {
     pub digest: Bytes32,
     pub c_v: Option<Bytes32>,
     pub h_ctx: Option<Bytes32>,
+    pub epoch: u64,
+    pub chain: Bytes32,
+    pub rcpt: Signature,
 }
 
 fn malformed(what: &'static str) -> CoreError {
@@ -104,6 +107,9 @@ mod tests {
             digest: [0u8; 32],
             c_v: Some([8u8; 32]),
             h_ctx: Some([9u8; 32]),
+            epoch: 0,
+            chain: [0u8; 32],
+            rcpt: Signature([0u8; 64]),
         };
         let digest = unsigned.recomputed_digest().unwrap();
         let entry = LogEntry {

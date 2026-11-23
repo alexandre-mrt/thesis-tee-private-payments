@@ -99,6 +99,9 @@ fn fixtures() -> Result<Fixtures> {
         digest,
         c_v: Some(digest),
         h_ctx: Some(digest),
+        epoch: 0,
+        chain: digest,
+        rcpt: sig,
     };
     Ok(Fixtures {
         parsed: VerifyingKey::parse(&pk)?,

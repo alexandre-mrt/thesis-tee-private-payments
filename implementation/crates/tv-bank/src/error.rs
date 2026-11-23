@@ -58,6 +58,8 @@ pub enum BankError {
     EnclaveAddress { input: String, reason: String },
     #[error("key file: {0}")]
     KeyFile(String),
+    #[error("the log was started under another receipt key than receipt.key")]
+    ReceiptKeyMismatch,
     #[error("{path} is locked by another bank process")]
     Locked { path: String },
     #[error("log line {line} is corrupt: {reason}")]

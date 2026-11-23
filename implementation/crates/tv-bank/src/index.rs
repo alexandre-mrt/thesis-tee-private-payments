@@ -1,14 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
-use tv_core::{BankResponse, Bytes32, LogEntry, OpKind};
+use tv_core::{BankResponse, Bytes32, LogEntry, OpKind, chain_genesis};
 
 use crate::error::BankError;
 
 pub const MAX_RANGE: u64 = 1024;
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Index {
+    receipt_pk: Bytes32,
+    head: Bytes32,
     entries: Vec<LogEntry>,
     spent: BTreeSet<Bytes32>,
     #[serde(serialize_with = "hex_keys")]
@@ -29,6 +31,27 @@ fn hex_keys<S: serde::Serializer>(
 }
 
 impl Index {
+    pub fn new(receipt_pk: Bytes32) -> Self {
+        Self {
+            receipt_pk,
+            head: chain_genesis(&receipt_pk),
+            entries: Vec::new(),
+            spent: BTreeSet::new(),
+            enrolled: BTreeMap::new(),
+            commitments: BTreeSet::new(),
+            by_serial: BTreeMap::new(),
+            by_digest: BTreeMap::new(),
+        }
+    }
+
+    pub fn receipt_pk(&self) -> Bytes32 {
+        self.receipt_pk
+    }
+
+    pub fn head(&self) -> Bytes32 {
+        self.head
+    }
+
     pub fn apply(&mut self, entry: LogEntry) -> Result<(), BankError> {
         let position = self.entries.len();
         if entry.seq != position as u64 {
@@ -50,13 +73,14 @@ impl Index {
         }
         self.commitments.extend(entry.commitments.iter().copied());
         self.by_digest.insert(entry.digest, position);
+        self.head = entry.chain;
         self.entries.push(entry);
         Ok(())
     }
 
     pub fn truncate(&mut self, len: usize) -> Result<(), BankError> {
         let kept: Vec<LogEntry> = self.entries.drain(..len.min(self.entries.len())).collect();
-        *self = Self::default();
+        *self = Self::new(self.receipt_pk);
         kept.into_iter().try_for_each(|entry| self.apply(entry))
     }
 
@@ -157,12 +181,15 @@ mod tests {
             digest: [seq as u8 + 50; 32],
             c_v: None,
             h_ctx: None,
+            epoch: 0,
+            chain: [seq as u8 + 60; 32],
+            rcpt: Signature([seq as u8 + 70; 64]),
         }
     }
 
     #[test]
     fn sequence_gaps_are_corrupt() {
-        let mut index = Index::default();
+        let mut index = Index::new([0u8; 32]);
         index.apply(entry(0, OpKind::Enroll, 1)).unwrap();
         assert!(matches!(
             index.apply(entry(2, OpKind::Enroll, 2)),
@@ -172,7 +199,7 @@ mod tests {
 
     #[test]
     fn bounded_lookups_fall_back_to_the_enroll_entry_and_truncate_rebuilds() {
-        let mut index = Index::default();
+        let mut index = Index::new([0u8; 32]);
         index.apply(entry(0, OpKind::Enroll, 1)).unwrap();
         index.apply(entry(1, OpKind::Refresh, 1)).unwrap();
         index.apply(entry(2, OpKind::Refresh, 2)).unwrap();

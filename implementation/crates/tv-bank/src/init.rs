@@ -78,7 +78,7 @@ fn populate(dir: &Path, reserve: u64) -> Result<BankKeys, BankError> {
             pending: None,
         },
     )?;
-    create_log(dir)?;
+    create_log(dir, &receipt_key.public_key())?;
     Ok(keys)
 }
 
