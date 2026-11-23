@@ -157,9 +157,16 @@ pub fn answer_for(entry: &LogEntry) -> Option<BankResponse> {
         (OpKind::Pay, [a, b]) => Some(BankResponse::Settled {
             sig_a_next: *a,
             sig_b_next: *b,
+            receipt: entry.receipt(),
         }),
-        (OpKind::Enroll, [sig]) => Some(BankResponse::Enrolled { sig: *sig }),
-        (OpKind::Refresh, [sig]) => Some(BankResponse::Refreshed { sig: *sig }),
+        (OpKind::Enroll, [sig]) => Some(BankResponse::Enrolled {
+            sig: *sig,
+            receipt: entry.receipt(),
+        }),
+        (OpKind::Refresh, [sig]) => Some(BankResponse::Refreshed {
+            sig: *sig,
+            receipt: entry.receipt(),
+        }),
         _ => None,
     }
 }

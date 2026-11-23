@@ -268,7 +268,8 @@ mod tests {
         assert_eq!(
             answer,
             BankResponse::Refreshed {
-                sig: Signature([1u8; 64])
+                sig: Signature([1u8; 64]),
+                receipt: store.entries()[1].receipt(),
             }
         );
         assert_eq!(store.durability(ticket).unwrap(), Durability::Durable);

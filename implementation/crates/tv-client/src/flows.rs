@@ -42,7 +42,7 @@ pub async fn enroll(wallet: &mut Wallet, bank: &BankClient) -> Result<(), Client
         sealed,
     }));
     match bank.call(&request).await? {
-        BankResponse::Enrolled { sig } => {
+        BankResponse::Enrolled { sig, .. } => {
             wallet.verify_new_state(&com0, &sig)?;
             wallet.set_enrolled(
                 State {
@@ -153,7 +153,7 @@ async fn move_to_next_serial(
         sealed,
     }));
     match bank.call(&request).await? {
-        BankResponse::Refreshed { sig } => {
+        BankResponse::Refreshed { sig, .. } => {
             wallet.verify_new_state(&com_next, &sig)?;
             wallet.advance(balance, sig)
         }

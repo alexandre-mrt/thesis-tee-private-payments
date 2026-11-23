@@ -96,7 +96,7 @@ impl Party {
     }
 
     pub fn enrolled(&mut self, response: BankResponse) -> Result<()> {
-        let BankResponse::Enrolled { sig } = response else {
+        let BankResponse::Enrolled { sig, .. } = response else {
             bail!("enroll not settled: {response:?}");
         };
         self.state = Some(SignedState {
@@ -201,6 +201,7 @@ pub fn settle(
     let BankResponse::Settled {
         sig_a_next,
         sig_b_next,
+        ..
     } = response
     else {
         bail!("payment not settled: {response:?}");

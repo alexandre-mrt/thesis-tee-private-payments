@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::commit::{PayFields, enroll_digest, pay_digest, refresh_digest};
 use crate::entry::LogEntry;
+use crate::receipt::Receipt;
 use crate::result::EnclaveResult;
 use crate::sig::Signature;
 use crate::types::{Bytes32, Manifest, Opening};
@@ -110,12 +111,15 @@ pub enum BankResponse {
     Settled {
         sig_a_next: Signature,
         sig_b_next: Signature,
+        receipt: Receipt,
     },
     Enrolled {
         sig: Signature,
+        receipt: Receipt,
     },
     Refreshed {
         sig: Signature,
+        receipt: Receipt,
     },
     Entry(Option<Box<LogEntry>>),
     Entries(Vec<LogEntry>),

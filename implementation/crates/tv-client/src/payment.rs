@@ -319,6 +319,7 @@ pub async fn submit_receive(
         BankResponse::Settled {
             sig_a_next,
             sig_b_next,
+            ..
         } => {
             wallet.verify_new_state(&prepared.com_b_next, &sig_b_next)?;
             Ok(Settlement {
