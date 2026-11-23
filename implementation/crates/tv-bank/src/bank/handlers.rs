@@ -3,7 +3,7 @@ use tv_core::{
     refresh_digest, verify_digest,
 };
 
-use super::{Bank, Outcome};
+use super::{Bank, Outcome, Settlement};
 use crate::journal::LogWriter;
 use crate::link::EnclaveLink;
 
@@ -31,14 +31,15 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
             Ok(_) => return Outcome::refuse("enclave result shape"),
             Err(outcome) => return outcome,
         };
-        self.settle(
-            OpKind::Pay,
-            vec![p.pk_a, p.pk_b],
-            vec![p.com_a_next, p.com_b_next],
-            sides,
+        let settlement = Settlement {
+            kind: OpKind::Pay,
+            serials: vec![p.pk_a, p.pk_b],
+            commitments: vec![p.com_a_next, p.com_b_next],
+            owner_sigs: vec![p.sig_a, p.sig_b],
             digest,
-        )
-        .await
+            evidence: Some((p.c_v, p.h_ctx)),
+        };
+        self.settle(settlement, sides).await
     }
 
     pub(super) async fn enroll(&self, enroll: &EnrollRequest) -> Outcome {
@@ -66,14 +67,15 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
             Ok(_) => return Outcome::refuse("enclave result shape"),
             Err(outcome) => return outcome,
         };
-        self.settle(
-            OpKind::Enroll,
-            vec![enroll.pk0],
-            vec![enroll.com0],
-            sides,
+        let settlement = Settlement {
+            kind: OpKind::Enroll,
+            serials: vec![enroll.pk0],
+            commitments: vec![enroll.com0],
+            owner_sigs: vec![enroll.sig],
             digest,
-        )
-        .await
+            evidence: None,
+        };
+        self.settle(settlement, sides).await
     }
 
     pub(super) async fn refresh(&self, refresh: &RefreshRequest) -> Outcome {
@@ -96,14 +98,15 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
             Ok(_) => return Outcome::refuse("enclave result shape"),
             Err(outcome) => return outcome,
         };
-        self.settle(
-            OpKind::Refresh,
-            vec![refresh.pk],
-            vec![refresh.com_next],
-            sides,
+        let settlement = Settlement {
+            kind: OpKind::Refresh,
+            serials: vec![refresh.pk],
+            commitments: vec![refresh.com_next],
+            owner_sigs: vec![refresh.sig],
             digest,
-        )
-        .await
+            evidence: None,
+        };
+        self.settle(settlement, sides).await
     }
 
     fn serials_unspent(&self, serials: &[Bytes32]) -> bool {

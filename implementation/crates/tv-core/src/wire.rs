@@ -2,6 +2,7 @@ use pt_tee::channel::{NONCE_LEN, PK_LEN};
 use serde::{Deserialize, Serialize};
 
 use crate::commit::{PayFields, enroll_digest, pay_digest, refresh_digest};
+use crate::entry::LogEntry;
 use crate::result::EnclaveResult;
 use crate::sig::Signature;
 use crate::types::{Bytes32, Manifest, Opening};
@@ -86,25 +87,6 @@ pub enum OpKind {
     Enroll,
     Pay,
     Refresh,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LogEntry {
-    pub seq: u64,
-    pub kind: OpKind,
-    pub serials: Vec<Bytes32>,
-    pub commitments: Vec<Bytes32>,
-    pub sigs: Vec<Signature>,
-    pub digest: Bytes32,
-}
-
-impl LogEntry {
-    pub fn sig_for(&self, commitment: &Bytes32) -> Option<Signature> {
-        self.commitments
-            .iter()
-            .position(|c| c == commitment)
-            .and_then(|i| self.sigs.get(i).copied())
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -231,19 +213,5 @@ mod tests {
         let req = BankRequest::LogRange { from: 3, limit: 9 };
         let back: BankRequest = decode_cbor(&encode_cbor(&req).unwrap()).unwrap();
         assert_eq!(back, req);
-    }
-
-    #[test]
-    fn log_entry_sig_lookup_follows_commitment_position() {
-        let entry = LogEntry {
-            seq: 0,
-            kind: OpKind::Pay,
-            serials: vec![[1u8; 32], [2u8; 32]],
-            commitments: vec![[3u8; 32], [4u8; 32]],
-            sigs: vec![Signature([5u8; 64]), Signature([6u8; 64])],
-            digest: [7u8; 32],
-        };
-        assert_eq!(entry.sig_for(&[4u8; 32]), Some(Signature([6u8; 64])));
-        assert_eq!(entry.sig_for(&[9u8; 32]), None);
     }
 }

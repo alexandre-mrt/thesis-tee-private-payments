@@ -14,7 +14,10 @@ pub fn pay_entry(seq: u64) -> LogEntry {
         serials: vec![random_bytes32(), random_bytes32()],
         commitments: vec![random_bytes32(), random_bytes32()],
         sigs: vec![random_signature(), random_signature()],
+        owner_sigs: vec![random_signature(), random_signature()],
         digest: random_bytes32(),
+        c_v: Some(random_bytes32()),
+        h_ctx: Some(random_bytes32()),
     }
 }
 

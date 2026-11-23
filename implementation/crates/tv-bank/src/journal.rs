@@ -126,7 +126,10 @@ pub(crate) mod testing {
             serials: vec![[serial; 32]],
             commitments: vec![[serial + 100; 32]],
             sigs,
+            owner_sigs: vec![Signature([seq as u8 + 2; 64])],
             digest: [seq as u8 + 50; 32],
+            c_v: None,
+            h_ctx: None,
         }
     }
 

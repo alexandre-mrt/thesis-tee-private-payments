@@ -10,6 +10,8 @@ pub enum CoreError {
     BadSignature,
     #[error("key derivation failed")]
     Derivation,
+    #[error("log entry: {what} is malformed")]
+    MalformedEntry { what: &'static str },
     #[error("memo of {len} bytes exceeds the limit of {max}")]
     MemoTooLong { len: usize, max: usize },
 }

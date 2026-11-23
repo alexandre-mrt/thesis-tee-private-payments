@@ -95,7 +95,10 @@ fn fixtures() -> Result<Fixtures> {
         serials: vec![pk, pk],
         commitments: vec![digest, digest],
         sigs: vec![sig, sig],
+        owner_sigs: vec![sig, sig],
         digest,
+        c_v: Some(digest),
+        h_ctx: Some(digest),
     };
     Ok(Fixtures {
         parsed: VerifyingKey::parse(&pk)?,

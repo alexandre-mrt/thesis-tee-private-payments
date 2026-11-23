@@ -5,6 +5,7 @@ use std::time::Duration;
 pub mod cbor;
 pub mod commit;
 pub mod derive;
+pub mod entry;
 pub mod error;
 pub mod pair;
 pub mod result;
@@ -18,6 +19,7 @@ pub use commit::{
     pay_digest, refresh_digest,
 };
 pub use derive::{Seed, derive_r, derive_sk};
+pub use entry::LogEntry;
 pub use error::CoreError;
 pub use pair::{PairSecret, designated_key};
 pub use result::{EnclaveResult, sign_result, verify_result, verify_result_with};
@@ -30,8 +32,7 @@ pub use types::{
 };
 pub use wire::{
     BankRequest, BankResponse, CheckOp, EnclaveRequest, EnclaveResponse, EnrollRequest,
-    EnrollSecret, LogEntry, OpKind, PayPublic, PaySecret, Receive, RefreshRequest, RefreshSecret,
-    SealedBlob,
+    EnrollSecret, OpKind, PayPublic, PaySecret, Receive, RefreshRequest, RefreshSecret, SealedBlob,
 };
 
 pub const B_MAX: u64 = 1_000_000;

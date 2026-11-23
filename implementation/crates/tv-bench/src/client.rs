@@ -8,8 +8,8 @@ use tv_client::{
     verify_bundle,
 };
 use tv_core::{
-    BankRequest, BankResponse, CheckOp, EnclaveRequest, EnclaveResponse, LogEntry, OpKind,
-    PaySecret, RefreshRequest, RefreshSecret, SideKind, SigningKey, encode_cbor, random_bytes32,
+    BankRequest, BankResponse, CheckOp, EnclaveRequest, EnclaveResponse, LogEntry, PaySecret,
+    RefreshRequest, RefreshSecret, SideKind, SigningKey, encode_cbor, random_bytes32,
     refresh_digest, sign_digest, sign_result,
 };
 
@@ -66,6 +66,7 @@ struct Sample {
     payee: Party,
     payment: Payment,
     settled: BankResponse,
+    entry: LogEntry,
     attest_request: BankRequest,
     attest_response: BankResponse,
 }
@@ -88,11 +89,15 @@ async fn sample(lb: &Loopback) -> Result<Sample> {
     if !matches!(settled, BankResponse::Settled { .. }) {
         bail!("payment not settled: {settled:?}");
     }
+    let Some(entry) = client.lookup(&payment.receive.public.pk_a).await? else {
+        bail!("the settled payment is not in the log");
+    };
     Ok(Sample {
         attested,
         payee,
         payment,
         settled,
+        entry,
         attest_request,
         attest_response,
     })
@@ -147,27 +152,12 @@ fn enclave_and_log_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
         digest,
         vec![SideKind::User, SideKind::User],
     ));
-    let BankResponse::Settled {
-        sig_a_next,
-        sig_b_next,
-    } = s.settled
-    else {
-        bail!("payment not settled: {:?}", s.settled);
-    };
-    let entry = LogEntry {
-        seq: 0,
-        kind: OpKind::Pay,
-        serials: vec![public.pk_a, public.pk_b],
-        commitments: vec![public.com_a_next, public.com_b_next],
-        sigs: vec![sig_a_next, sig_b_next],
-        digest,
-    };
     Ok(vec![
         ("wire bank->enclave Check(Pay)".to_owned(), frame(&check)?),
         ("wire enclave->bank Result".to_owned(), frame(&result)?),
         (
             "log.jsonl line (Pay)".to_owned(),
-            serde_json::to_vec(&entry)?.len() + 1,
+            serde_json::to_vec(&s.entry)?.len() + 1,
         ),
     ])
 }

@@ -54,6 +54,15 @@ impl Outcome {
     }
 }
 
+pub(crate) struct Settlement {
+    pub kind: OpKind,
+    pub serials: Vec<Bytes32>,
+    pub commitments: Vec<Bytes32>,
+    pub owner_sigs: Vec<Signature>,
+    pub digest: Bytes32,
+    pub evidence: Option<(Bytes32, Bytes32)>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Policy {
     pub trust: EnclaveTrust,
@@ -301,21 +310,15 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
         }
     }
 
-    async fn settle(
-        &self,
-        kind: OpKind,
-        serials: Vec<Bytes32>,
-        commitments: Vec<Bytes32>,
-        sides: Vec<SideKind>,
-        digest: Bytes32,
-    ) -> Outcome {
-        let sigs = commitments
+    async fn settle(&self, settlement: Settlement, sides: Vec<SideKind>) -> Outcome {
+        let kind = settlement.kind;
+        let sigs = settlement
+            .commitments
             .iter()
             .zip(&sides)
             .map(|(com, side)| sign_state(self.signer(*side), com))
             .collect();
-        let (ticket, response, staged) = match self.stage(kind, serials, commitments, sigs, digest)
-        {
+        let (ticket, response, staged) = match self.stage(settlement, sigs) {
             Ok(staged) => staged,
             Err(reason) => return Outcome::refuse(reason),
         };
@@ -333,22 +336,19 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
 
     fn stage(
         &self,
-        kind: OpKind,
-        serials: Vec<Bytes32>,
-        commitments: Vec<Bytes32>,
+        s: Settlement,
         sigs: Vec<Signature>,
-        digest: Bytes32,
     ) -> Result<(Ticket, BankResponse, bool), &'static str> {
         let mut store = self.store();
-        if let Some((ticket, answer)) = store.answer(&digest) {
+        if let Some((ticket, answer)) = store.answer(&s.digest) {
             return Ok((ticket, answer, false));
         }
-        let consumed = serials.iter().any(|s| match kind {
-            OpKind::Enroll => !store.index().is_fresh_serial(s),
-            OpKind::Pay | OpKind::Refresh => store.index().is_spent(s),
+        let consumed = s.serials.iter().any(|serial| match s.kind {
+            OpKind::Enroll => !store.index().is_fresh_serial(serial),
+            OpKind::Pay | OpKind::Refresh => store.index().is_spent(serial),
         });
-        let reused = kind == OpKind::Enroll
-            && commitments
+        let reused = s.kind == OpKind::Enroll
+            && s.commitments
                 .iter()
                 .any(|c| !store.index().is_fresh_commitment(c));
         if consumed || reused {
@@ -356,11 +356,14 @@ impl<L: EnclaveLink, W: LogWriter> Bank<L, W> {
         }
         let entry = LogEntry {
             seq: store.index().len(),
-            kind,
-            serials,
-            commitments,
+            kind: s.kind,
+            serials: s.serials,
+            commitments: s.commitments,
             sigs,
-            digest,
+            owner_sigs: s.owner_sigs,
+            digest: s.digest,
+            c_v: s.evidence.map(|(c_v, _)| c_v),
+            h_ctx: s.evidence.map(|(_, h_ctx)| h_ctx),
         };
         let Some(response) = answer_for(&entry) else {
             return Err("entry shape");
