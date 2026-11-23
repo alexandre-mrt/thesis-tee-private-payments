@@ -187,6 +187,23 @@ fn nr7_a_designated_tag_is_one_the_verifier_could_have_made_itself() {
     assert!(verify_proof(&keys, &proof(&w, 3), &CHALLENGE, None).is_err());
 }
 
+#[test]
+fn a_designated_proof_hides_who_presented_but_not_the_amount_or_context() {
+    let w = world(17);
+    let keys = ProofKeys {
+        bank: &w.bank,
+        receipt: &w.receipt,
+    };
+    let re_presented = Proof {
+        presentation: Presentation::Amount,
+        ..proof(&w, 3)
+    };
+    let facts = verify_proof(&keys, &re_presented, &CHALLENGE, None).unwrap();
+    assert_eq!(facts.v, 17);
+    assert_eq!(facts.memo.as_deref(), Some(MEMO));
+    assert_eq!(facts.holder, None);
+}
+
 proptest! {
     #[test]
     fn nr7_any_changed_field_or_another_challenge_is_refused(

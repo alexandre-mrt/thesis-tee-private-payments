@@ -20,7 +20,7 @@ cli alice pay --request "${DATA}/req-pay.json" --amount 120 --out "${DATA}/offer
 cli bob receive --offer "${DATA}/offer-pay.json" --out "${DATA}/receipt-pay.json"
 cli alice finish --receipt "${DATA}/receipt-pay.json"
 
-echo "== alice proves she paid, bob proves to alice alone that he received"
+echo "== alice proves she paid, bob proves to alice that he received (designated: deniable as to who presented, not as to amount and memo)"
 SEQ="$(sed -n 's/^ *"seq": \([0-9]*\),$/\1/p' "${DATA}/receipt-pay.json" | head -1)"
 cli alice prove-payment --seq "${SEQ}" --mode payer --challenge "$(printf '11%.0s' {1..32})" --out "${DATA}/proof-payer.json"
 cli bob verify-proof --proof "${DATA}/proof-payer.json" --challenge "$(printf '11%.0s' {1..32})"

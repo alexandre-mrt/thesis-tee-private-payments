@@ -94,7 +94,7 @@ Wallet JSON: seed, current index `i`, current signed state `(b, C, σ)`, pending
 - Attestation freshness: every party that seals to an attested key (enroll, refresh, request, pay) rejects a document whose `timestamp` is `MAX_KEY_AGE` (10 minutes) old or more, or ahead of its clock beyond the skew. Bob's nonce proves freshness to Bob only; without this check a payee colluding with a reader who copied a channel key during a past break could replay that old attestation and read the payer's opening offline.
 - Retries: deterministic inputs; after an enclave restart a pending `receive` re-attests, and the payer reseals (`tv-cli reseal`). A payee whose request was used by an aborted payment refreshes.
 - Global flags: `--bank ADDR`, `--allow-mock` or `--pcr0 HEX`.
-- Evidence: `new` pins `--receipt-pk`; `request --memo`; the payee checks `C_v` and `h_ctx` before signing (C1); every wallet verifies the receipt of its own operation (C3) and the chain head it saw at its next full download (C4); `prove-payment` and `verify-proof` (modes payer, payee, amount, designated); evidence is rebuilt from the seed by the recovery walk, except the memo.
+- Evidence: `new` pins `--receipt-pk`; `request --memo`; the payee checks `C_v` and `h_ctx` before signing (C1); every wallet verifies the receipt of its own operation (C3) and the chain head it saw at its next full download (C4); `prove-payment` and `verify-proof` (modes payer, payee, amount, designated; designated is deniable as to who presented the proof, not as to the amount and context, which any holder of the openings can show); evidence is rebuilt from the seed by the recovery walk, except the memo.
 
 ## 6. Binaries, scripts, deploy
 

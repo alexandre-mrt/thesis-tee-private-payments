@@ -138,6 +138,8 @@ pub fn check(
     Ok(verify_proof(&keys, proof, challenge, verifier)?)
 }
 
+pub const DESIGNATED_SCOPE: &str = "deniable as to who presented the proof, not as to the amount and context, which any holder of the openings can show";
+
 fn describe(facts: &ProofFacts) -> String {
     let memo = facts
         .memo
@@ -150,7 +152,7 @@ fn describe(facts: &ProofFacts) -> String {
     let kind = if facts.transferable {
         "transferable"
     } else {
-        "not transferable"
+        DESIGNATED_SCOPE
     };
     format!(
         "proof verified: payment {} in epoch {} moved {}, memo {memo}, presented by {holder} ({kind})",
@@ -187,3 +189,6 @@ impl Session {
         Ok(describe(&check(&wallet, &proof, challenge, verifier)?))
     }
 }
+
+#[cfg(test)]
+mod tests;
