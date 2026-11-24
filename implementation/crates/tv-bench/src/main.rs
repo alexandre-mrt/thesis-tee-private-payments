@@ -24,6 +24,8 @@ use crate::setup::{Loopback, Remote};
 use crate::stats::{line, ms, percentiles, rate_line};
 
 const UNKNOWN_CPU: &str = "unknown";
+const CPUINFO: &str = "/proc/cpuinfo";
+const CPUINFO_MODEL: &str = "model name";
 const GROUP_WRITERS: usize = 64;
 const SETTLE_OVERSUBSCRIPTION: usize = 4;
 const PROFILE_SCALE: usize = 10;
@@ -105,13 +107,26 @@ fn cores() -> usize {
         .unwrap_or(1)
 }
 
-fn cpu_brand() -> String {
+fn sysctl_brand() -> Option<String> {
     Command::new("sysctl")
         .args(["-n", "machdep.cpu.brand_string"])
         .output()
         .ok()
         .filter(|out| out.status.success())
         .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+fn cpuinfo_brand() -> Option<String> {
+    std::fs::read_to_string(CPUINFO)
+        .ok()?
+        .lines()
+        .find_map(|l| l.strip_prefix(CPUINFO_MODEL))
+        .map(|rest| rest.trim_start_matches([' ', '\t', ':']).trim().to_owned())
+}
+
+fn cpu_brand() -> String {
+    sysctl_brand()
+        .or_else(cpuinfo_brand)
         .unwrap_or_else(|| UNKNOWN_CPU.to_owned())
 }
 
