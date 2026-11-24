@@ -7,6 +7,8 @@ BANK_ADDR="${TV_BANK_ADDR:-127.0.0.1:7700}"
 BANK_DATA="${TV_BANK_DATA:-${HOME}/bank}"
 EIF_JSON="${TV_EIF_JSON:-${HOME}/eif.json}"
 PAYMENTS="${TV_BENCH_PAYMENTS:-1000}"
+RUNS="${TV_BENCH_RUNS:-3}"
+ENCLAVE="${TV_ENCLAVE:-vsock://16:5005}"
 OUT="${TV_BENCH_OUT:-${HOME}/bench-results/$(date -u +%Y%m%dT%H%M%SZ)}"
 BENCH_TMP="${TV_BENCH_TMPDIR:-${HOME}/bench-tmp}"
 IMDS="http://169.254.169.254/latest"
@@ -65,7 +67,22 @@ record_context() {
     echo "bank=${BANK_ADDR}"
     echo "pcr0=${PCR0:-mock}"
     echo "payments=${PAYMENTS}"
+    echo "runs=${RUNS}"
+    echo "enclave=${ENCLAVE}"
   } | tee "${OUT}/context.txt"
+}
+
+run_once() {
+  local run="$1"
+  echo "== run ${run}/${RUNS}: local mock baseline on this machine"
+  "${BIN}/tv-bench" --payments "${PAYMENTS}" | tee "${OUT}/mock-${run}.txt"
+  echo "== run ${run}/${RUNS}: running bank with the enclave behind it"
+  # shellcheck disable=SC2046 # trust_args is two words on purpose
+  "${BIN}/tv-bench" --payments "${PAYMENTS}" --remote "${BANK_ADDR}" --bank-data "${BANK_DATA}" \
+    $(trust_args) | tee "${OUT}/nitro-${run}.txt"
+  echo "== run ${run}/${RUNS}: enclave called directly, without the bank"
+  "${BIN}/tv-bench" --payments "${PAYMENTS}" --enclave "${ENCLAVE}" --bank-data "${BANK_DATA}" |
+    tee "${OUT}/direct-${run}.txt"
 }
 
 main() {
@@ -79,12 +96,10 @@ main() {
   check_bank
   check_enclave
   record_context
-  echo "== 1/2 local mock baseline on this machine"
-  "${BIN}/tv-bench" --payments "${PAYMENTS}" | tee "${OUT}/mock.txt"
-  echo "== 2/2 running bank with the enclave behind it"
-  # shellcheck disable=SC2046 # trust_args is two words on purpose
-  "${BIN}/tv-bench" --payments "${PAYMENTS}" --remote "${BANK_ADDR}" --bank-data "${BANK_DATA}" \
-    $(trust_args) | tee "${OUT}/nitro.txt"
+  local run
+  for run in $(seq 1 "${RUNS}"); do
+    run_once "${run}"
+  done
   echo "results in ${OUT}"
 }
 
