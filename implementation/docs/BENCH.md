@@ -27,7 +27,7 @@ make nitro-bench          # on the EC2 parent: build, scripts/nitro-up.sh (encla
 make nitro-down           # stop the bank and terminate the enclave
 ```
 
-`--remote` skips the in-process sections and runs the latency, wallet flow, client cost and message size sections against that bank, then a settle throughput run with 1, cores and 4 x cores concurrent pairs over TCP. The bank's wallet in `--bank-data` funds the bench wallets, so do not run `tv-bank` wallet commands at the same time. `--allow-mock` replaces `--pcr0` for a local mock bank. `scripts/nitro-bench.sh` reads PCR0 from `~/eif.json` (the `nitro-cli build-enclave` output) unless `PCR0` is set, and writes `context.txt`, `enclave.json`, `mock.txt` and `nitro.txt` to `~/bench-results/<UTC time>/`.
+`--remote` skips the in-process sections and runs the latency, wallet flow, client cost and message size sections against that bank, then a settle throughput run with 1, cores and 4 x cores concurrent pairs over TCP. The bank's wallet in `--bank-data` funds the bench wallets, so do not run `tv-bank` wallet commands at the same time. `--allow-mock` replaces `--pcr0` for a local mock bank. `scripts/nitro-bench.sh` reads PCR0 from `~/eif.json` (the `nitro-cli build-enclave` output) unless `PCR0` is set, and writes `context.txt`, `enclave.json`, `mock.txt` and `nitro.txt` to `~/bench-results/<UTC time>/`. It points `TMPDIR` at `~/bench-tmp` (or `TV_BENCH_TMPDIR`), because `/tmp` is a tmpfs on Amazon Linux 2023: there an fsync costs nothing and the mock baseline's store and wallet figures would not be comparable with a bank writing to EBS.
 
 What each section measures:
 

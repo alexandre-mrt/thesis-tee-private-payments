@@ -8,6 +8,7 @@ BANK_DATA="${TV_BANK_DATA:-${HOME}/bank}"
 EIF_JSON="${TV_EIF_JSON:-${HOME}/eif.json}"
 PAYMENTS="${TV_BENCH_PAYMENTS:-1000}"
 OUT="${TV_BENCH_OUT:-${HOME}/bench-results/$(date -u +%Y%m%dT%H%M%SZ)}"
+BENCH_TMP="${TV_BENCH_TMPDIR:-${HOME}/bench-tmp}"
 IMDS="http://169.254.169.254/latest"
 PCR0_HEX_LEN=96
 
@@ -60,6 +61,7 @@ record_context() {
     echo "commit=$(git -C "${ROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
     echo "instance_type=$(instance_type)"
     echo "kernel=$(uname -sr)"
+    echo "bench_tmpdir=${BENCH_TMP} ($(df -P "${BENCH_TMP}" | awk 'NR == 2 { print $1 }'))"
     echo "bank=${BANK_ADDR}"
     echo "pcr0=${PCR0:-mock}"
     echo "payments=${PAYMENTS}"
@@ -68,7 +70,8 @@ record_context() {
 
 main() {
   [ -x "${BIN}/tv-bench" ] || die "build first: cargo build --release -p tv-bench"
-  mkdir -p "${OUT}"
+  mkdir -p "${OUT}" "${BENCH_TMP}"
+  export TMPDIR="${BENCH_TMP}"
   if [ "${ALLOW_MOCK:-0}" != "1" ]; then
     PCR0="${PCR0:-$(pcr0_of_eif)}"
     [ "${#PCR0}" -eq "${PCR0_HEX_LEN}" ] || die "PCR0 must be ${PCR0_HEX_LEN} hex characters"
