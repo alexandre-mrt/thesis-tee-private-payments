@@ -13,6 +13,7 @@ Rust prototype of [round 1](../round-1/PROTOCOL.md) as revised at the advisor me
 | [docs/DESIGN.md](docs/DESIGN.md) | What the code does: processes and keys, primitives, wire messages, which check carries which property, what the bank sees, blast radius of an enclave read, limitations |
 | [docs/payment-flow.pdf](docs/payment-flow.pdf) | One payment through the code: every wire message with its fields, the function behind each step, B1 to B4 and E1 to E4, keys, what is persisted where, which check carries P1 to P5, what the bank sees ([PNG](docs/payment-flow.png), [source](docs/payment-flow.tex)) |
 | [docs/payment-flow-2.pdf](docs/payment-flow-2.pdf) | Around the payment: startup and enclave registration, enroll and refresh, issue and redeem, recovery from the seed, crash and retry cases ([PNG](docs/payment-flow-2.png), [source](docs/payment-flow-2.tex)) |
+| [docs/NON-REPUDIATION.md](docs/NON-REPUDIATION.md) | Non-repudiation on this branch: one diagram, what it adds, how it works, cost and limits ([PDF](docs/evidence-flow.pdf), [source](docs/evidence-flow.tex)) |
 | [docs/BENCH.md](docs/BENCH.md) | Measured performance, machine, commands, before and after each optimisation |
 
 ## Layout
