@@ -2,6 +2,7 @@
 
 mod attest_cost;
 mod client;
+mod direct;
 mod enclave;
 mod latency;
 mod party;
@@ -81,9 +82,16 @@ struct Args {
     allow_mock: bool,
     #[arg(
         long,
-        help = "Data directory of the running bank (its wallet funds --remote runs)"
+        help = "Data directory of the running bank (its wallet funds --remote runs, its state key signs --enclave runs)"
     )]
     bank_data: Option<PathBuf>,
+    #[arg(
+        long,
+        requires = "bank_data",
+        conflicts_with = "remote",
+        help = "Enclave endpoint (vsock://CID:PORT) of a running enclave: call it directly, without the bank"
+    )]
+    enclave: Option<String>,
 }
 
 struct Workspace(PathBuf);
@@ -245,6 +253,24 @@ fn attest_cost_bench(doc: &[u8], iterations: usize) -> Result<()> {
     Ok(())
 }
 
+async fn direct_benches(args: &Args, enclave: &str, bank_data: &Path) -> Result<()> {
+    println!("== enclave {enclave} called directly (no bank, sequential)");
+    let lat = direct::direct_latency(enclave, bank_data, args.payments).await?;
+    print_percentiles("round trip (Cancel of an unknown key)", &lat.round_trip);
+    print_percentiles("attest (attestation document)", &lat.attest);
+    print_percentiles("check (Pay)", &lat.check);
+    let run = enclave::check_throughput(args.checks, 1)?;
+    println!(
+        "{}",
+        rate_line(
+            "same check in process on this host, 1 thread",
+            run.checks,
+            run.elapsed
+        )
+    );
+    attest_cost_bench(&lat.doc, args.iterations)
+}
+
 async fn sizes_bench(lb: &Loopback) -> Result<()> {
     println!("== message sizes");
     for (label, bytes) in client::message_sizes(lb).await? {
@@ -309,6 +335,12 @@ fn main() -> Result<()> {
     let workspace = Workspace::create()?;
     println!("machine: {} ({} logical cores)", cpu_brand(), cores());
     let remote = remote_of(&args)?;
+    if let (Some(enclave), Some(bank_data)) = (args.enclave.as_deref(), args.bank_data.as_deref()) {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?;
+        return runtime.block_on(direct_benches(&args, enclave, bank_data));
+    }
     if remote.is_none() {
         sync_benches(&args, &workspace.0)?;
     }
