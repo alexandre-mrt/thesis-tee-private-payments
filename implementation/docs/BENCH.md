@@ -18,6 +18,15 @@ make bench                                   # cargo run --release -p tv-bench -
 git checkout 8ffabbe && make bench           # reproduces the "before" column (bench crate, unoptimized code)
 ```
 
+Against a bank that is already running (the Nitro deployment, where the enclave sits behind vsock and attests for real):
+
+```
+./target/release/tv-bench --payments 1000 --remote 127.0.0.1:7700 --bank-data ~/bank --pcr0 <PCR0>
+scripts/nitro-bench.sh    # checks the enclave runs in production mode with that PCR0, runs the local mock baseline and the remote run, saves both
+```
+
+`--remote` skips the in-process sections and runs the latency, wallet flow, client cost and message size sections against that bank, then a settle throughput run with 1, cores and 4 x cores concurrent pairs over TCP. The bank's wallet in `--bank-data` funds the bench wallets, so do not run `tv-bank` wallet commands at the same time. `--allow-mock` replaces `--pcr0` for a local mock bank. `scripts/nitro-bench.sh` reads PCR0 from `~/eif.json` (the `nitro-cli build-enclave` output) unless `PCR0` is set, and writes `context.txt`, `enclave.json`, `mock.txt` and `nitro.txt` to `~/bench-results/<UTC time>/`.
+
 What each section measures:
 
 - primitive costs: mean per operation over 2000 iterations, in process.
