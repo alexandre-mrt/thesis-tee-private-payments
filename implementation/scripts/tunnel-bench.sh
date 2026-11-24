@@ -64,6 +64,9 @@ open_tunnel() {
 
 take_wallet() {
   local remote="${REMOTE_BANK_DATA}/${WALLET}"
+  if on_host pgrep -x tv-bench >/dev/null; then
+    die "a tv-bench run is in progress on ${HOST}; wait for it to finish"
+  fi
   on_host test -f "${remote}" -a ! -e "${remote}${AWAY_SUFFIX}" ||
     die "${remote} missing on ${HOST}, or a ${AWAY_SUFFIX} copy is already set aside"
   mkdir -p "${OUT}/bank"
