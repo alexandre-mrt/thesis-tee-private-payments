@@ -6,8 +6,10 @@ use pt_tee::attestation::{AttestationVerifier, MockProvider};
 use pt_tee::channel::PK_LEN;
 use pt_tee::transport::{Endpoint, Listener};
 use tokio::sync::watch;
-use tv_bank::{Bank, EnclaveLink, EnclaveTrust, LinkError, Policy, ServerConfig, TcpLink};
-use tv_client::{AttestationBundle, BankClient, Trust, verify_bundle};
+use tv_bank::{
+    Bank, EnclaveLink, EnclaveTrust, LinkError, Policy, ServerConfig, TcpLink, bank_wallet_path,
+};
+use tv_client::{AttestationBundle, BankClient, Trust, Wallet, verify_bundle};
 use tv_core::{
     BankKeys, BankRequest, BankResponse, Bytes32, CheckOp, EnclaveResponse, random_bytes32,
 };
@@ -131,8 +133,9 @@ fn local_addr(listener: &Listener) -> Result<String> {
 }
 
 pub struct Loopback {
-    pub client: BankClient,
+    pub client: Arc<BankClient>,
     pub dir: PathBuf,
+    pub bank_wallet: PathBuf,
     pub keys: BankKeys,
     shutdown: Vec<watch::Sender<bool>>,
 }
@@ -176,11 +179,36 @@ pub async fn start_loopback(root: &Path, name: &str) -> Result<Loopback> {
             eprintln!("bank server: {err}");
         }
     });
-    let client = BankClient::new(Endpoint::tcp(&bank_addr)?, &client_trust())?;
+    let client = Arc::new(BankClient::new(
+        Endpoint::tcp(&bank_addr)?,
+        &client_trust(),
+    )?);
     Ok(Loopback {
         client,
+        bank_wallet: bank_wallet_path(&dir),
         dir,
         keys,
         shutdown: vec![enclave_tx, bank_tx],
+    })
+}
+
+pub struct Remote<'a> {
+    pub bank: &'a str,
+    pub trust: Trust,
+    pub bank_data: &'a Path,
+}
+
+pub fn connect_remote(root: &Path, remote: &Remote) -> Result<Loopback> {
+    let dir = root.join("remote");
+    std::fs::create_dir_all(&dir)?;
+    let bank_wallet = bank_wallet_path(remote.bank_data);
+    let keys = Wallet::load(&bank_wallet)?.bank();
+    let client = Arc::new(BankClient::new(Endpoint::tcp(remote.bank)?, &remote.trust)?);
+    Ok(Loopback {
+        client,
+        dir,
+        bank_wallet,
+        keys,
+        shutdown: Vec::new(),
     })
 }

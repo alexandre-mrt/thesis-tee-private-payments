@@ -5,6 +5,7 @@ mod enclave;
 mod latency;
 mod party;
 mod profile;
+mod remote;
 mod settle;
 mod setup;
 mod stats;
@@ -14,9 +15,12 @@ use std::num::NonZero;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Parser;
 
+use tv_client::Trust;
+
+use crate::setup::{Loopback, Remote};
 use crate::stats::{line, ms, percentiles, rate_line};
 
 const UNKNOWN_CPU: &str = "unknown";
@@ -52,6 +56,31 @@ struct Args {
         help = "Iterations of the client-side cost run"
     )]
     iterations: usize,
+    #[arg(
+        long,
+        requires = "bank_data",
+        help = "Bank address HOST:PORT of a running bank: measure it instead of local mock setups"
+    )]
+    remote: Option<String>,
+    #[arg(
+        long,
+        requires = "remote",
+        conflicts_with = "allow_mock",
+        help = "PCR0 the running bank's enclave must attest"
+    )]
+    pcr0: Option<String>,
+    #[arg(
+        long,
+        requires = "remote",
+        help = "Accept mock attestation from the running bank (loopback bank only)"
+    )]
+    allow_mock: bool,
+    #[arg(
+        long,
+        requires = "remote",
+        help = "Data directory of the running bank (its wallet funds the bench wallets)"
+    )]
+    bank_data: Option<PathBuf>,
 }
 
 struct Workspace(PathBuf);
@@ -148,45 +177,106 @@ async fn in_process_benches(args: &Args, root: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn loopback_benches(args: &Args, root: &Path) -> Result<()> {
-    println!("== loopback TCP latency (user -> bank -> enclave, sequential payments)");
-    let lb = setup::start_loopback(root, "latency").await?;
-    let lat = latency::payment_latency(&lb, args.payments).await?;
+async fn latency_bench(args: &Args, lb: &Loopback) -> Result<()> {
+    let lat = latency::payment_latency(lb, args.payments).await?;
     print_percentiles("attest round trip", &lat.attest);
     print_percentiles("build offer and payee blob", &lat.build);
     print_percentiles("receive round trip", &lat.receive);
     print_percentiles("payment total", &lat.total);
-    drop(lb);
-    let lb = setup::start_loopback(root, "wallet-flow").await?;
-    let flow = latency::wallet_flow_latency(&lb, args.payments).await?;
+    Ok(())
+}
+
+async fn wallet_flow_bench(args: &Args, lb: &Loopback) -> Result<()> {
+    let flow = latency::wallet_flow_latency(lb, args.payments).await?;
     print_percentiles(
         "tv-cli flow request+pay+receive+finish with wallet files",
         &flow,
     );
-    drop(lb);
+    Ok(())
+}
+
+async fn client_cost_bench(args: &Args, lb: &Loopback) -> Result<()> {
     println!("== client-side cost");
-    let lb = setup::start_loopback(root, "client-cost").await?;
-    let cost = client::client_cost(&lb, args.iterations).await?;
+    let cost = client::client_cost(lb, args.iterations).await?;
     print_percentiles("verify attestation bundle", &cost.verify);
     print_percentiles("seal payer opening", &cost.seal);
     print_percentiles("build offer (prepare_pay)", &cost.offer);
-    drop(lb);
+    Ok(())
+}
+
+async fn sizes_bench(lb: &Loopback) -> Result<()> {
     println!("== message sizes");
-    let lb = setup::start_loopback(root, "sizes").await?;
-    for (label, bytes) in client::message_sizes(&lb).await? {
+    for (label, bytes) in client::message_sizes(lb).await? {
         println!("{label}: {bytes} bytes");
     }
     Ok(())
+}
+
+async fn loopback_benches(args: &Args, root: &Path) -> Result<()> {
+    println!("== loopback TCP latency (user -> bank -> enclave, sequential payments)");
+    latency_bench(args, &setup::start_loopback(root, "latency").await?).await?;
+    wallet_flow_bench(args, &setup::start_loopback(root, "wallet-flow").await?).await?;
+    client_cost_bench(args, &setup::start_loopback(root, "client-cost").await?).await?;
+    sizes_bench(&setup::start_loopback(root, "sizes").await?).await
+}
+
+async fn remote_benches(args: &Args, root: &Path, remote: &Remote<'_>) -> Result<()> {
+    let lb = setup::connect_remote(root, remote)?;
+    println!(
+        "== remote bank {} (user -> bank -> enclave, sequential payments)",
+        remote.bank
+    );
+    latency_bench(args, &lb).await?;
+    wallet_flow_bench(args, &lb).await?;
+    client_cost_bench(args, &lb).await?;
+    sizes_bench(&lb).await?;
+    println!("== remote bank settle throughput (concurrent pairs over TCP, full Receive path)");
+    let pairs = args.pairs.unwrap_or_else(cores);
+    for pairs in [1, pairs, pairs * SETTLE_OVERSUBSCRIPTION] {
+        let run = remote::settle_over_tcp(&lb, pairs, args.payments.div_ceil(pairs)).await?;
+        println!(
+            "{}",
+            rate_line(
+                &format!("payments with {} concurrent pair(s)", run.pairs),
+                run.payments,
+                run.elapsed
+            )
+        );
+    }
+    Ok(())
+}
+
+fn remote_of(args: &Args) -> Result<Option<Remote<'_>>> {
+    let (Some(bank), Some(bank_data)) = (args.remote.as_deref(), args.bank_data.as_deref()) else {
+        return Ok(None);
+    };
+    if args.pcr0.is_none() && !args.allow_mock {
+        bail!("--remote needs --pcr0 HEX, or --allow-mock for a local mock bank");
+    }
+    Ok(Some(Remote {
+        bank,
+        trust: Trust {
+            pcr0_hex: args.pcr0.clone(),
+            allow_mock: args.allow_mock,
+        },
+        bank_data,
+    }))
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
     let workspace = Workspace::create()?;
     println!("machine: {} ({} logical cores)", cpu_brand(), cores());
-    sync_benches(&args, &workspace.0)?;
+    let remote = remote_of(&args)?;
+    if remote.is_none() {
+        sync_benches(&args, &workspace.0)?;
+    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
+    if let Some(remote) = remote {
+        return runtime.block_on(remote_benches(&args, &workspace.0, &remote));
+    }
     runtime.block_on(async {
         in_process_benches(&args, &workspace.0).await?;
         loopback_benches(&args, &workspace.0).await

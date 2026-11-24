@@ -1,8 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use tv_bank::bank_wallet_path;
-use tv_client::{BankClient, Wallet, WalletData, flows, payment as wallet_payment};
+use tv_client::{BankClient, Wallet, flows, payment as wallet_payment};
 use tv_core::{BankRequest, Seed};
 
 use crate::party::{Party, payment, settle};
@@ -37,18 +36,15 @@ pub async fn pay_over_tcp(
     settle(payer, payee, &payment, response)
 }
 
-pub fn bank_party(lb: &Loopback) -> Result<Party> {
-    Ok(Party::from_wallet(&WalletData::read(&bank_wallet_path(
-        &lb.dir,
-    ))?))
+pub async fn funded_party(lb: &Loopback, tag: &str, balance: u64) -> Result<Party> {
+    let (payer, _) = funded_wallets(lb, tag, balance).await?;
+    Ok(Party::from_wallet(payer.data()))
 }
 
 pub async fn payment_latency(lb: &Loopback, count: usize) -> Result<PaymentLatency> {
     let client = &lb.client;
-    let mut bank = bank_party(lb)?;
-    let mut payer = enroll_over_tcp(client).await?;
+    let mut payer = funded_party(lb, "latency", count as u64).await?;
     let mut payee = enroll_over_tcp(client).await?;
-    pay_over_tcp(client, &mut bank, &mut payer, count as u64).await?;
     let mut out = PaymentLatency {
         attest: Vec::with_capacity(count),
         build: Vec::with_capacity(count),
@@ -100,7 +96,7 @@ pub async fn funded_wallets(lb: &Loopback, tag: &str, balance: u64) -> Result<(W
     )?;
     flows::enroll_and_refresh(&mut alice, client).await?;
     flows::enroll_and_refresh(&mut bob, client).await?;
-    let mut bank_wallet = Wallet::load(&bank_wallet_path(&lb.dir))?;
+    let mut bank_wallet = Wallet::load(&lb.bank_wallet)?;
     transfer(client, &mut bank_wallet, &mut alice, balance).await?;
     Ok((alice, bob))
 }

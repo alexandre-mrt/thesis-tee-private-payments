@@ -13,7 +13,7 @@ use tv_core::{
     random_bytes32, refresh_digest, sign_digest, sign_result,
 };
 
-use crate::latency::{bank_party, enroll_over_tcp, funded_wallets, pay_over_tcp};
+use crate::latency::{enroll_over_tcp, funded_party, funded_wallets};
 use crate::party::{Party, Payment, payment};
 use crate::setup::Loopback;
 
@@ -72,10 +72,8 @@ struct Sample {
 
 async fn sample(lb: &Loopback) -> Result<Sample> {
     let client = &lb.client;
-    let mut bank = bank_party(lb)?;
-    let mut payer = enroll_over_tcp(client).await?;
+    let payer = funded_party(lb, "sizes", COST_FUNDING).await?;
     let payee = enroll_over_tcp(client).await?;
-    pay_over_tcp(client, &mut bank, &mut payer, COST_FUNDING).await?;
     let attest_request = BankRequest::Attest {
         nonce: random_bytes32(),
         owner: payee.pk()?,
@@ -124,7 +122,7 @@ fn user_wire_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
             frame(&s.attest_request)?,
         ),
         (
-            "wire bank->user Attestation (mock doc + manifest)".to_owned(),
+            "wire bank->user Attestation (attestation doc + manifest)".to_owned(),
             frame(&s.attest_response)?,
         ),
         ("wire user->bank Enroll".to_owned(), frame(&enroll)?),
@@ -193,7 +191,7 @@ fn enclave_attest_sizes(s: &Sample) -> Result<Vec<(String, usize)>> {
     Ok(vec![
         ("wire bank->enclave Attest".to_owned(), frame(&attest)?),
         (
-            "wire enclave->bank Attestation (mock doc + manifest + channel pk)".to_owned(),
+            "wire enclave->bank Attestation (attestation doc + manifest + channel pk)".to_owned(),
             frame(&attestation)?,
         ),
         ("wire bank->enclave Cancel".to_owned(), frame(&cancel)?),
