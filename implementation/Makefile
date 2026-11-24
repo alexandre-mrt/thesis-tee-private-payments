@@ -17,4 +17,13 @@ crash-demo: ## Enclave killed before its answer, bank killed after its append: r
 bench: ## Enclave checks, store appends, bank settles, loopback latency, client cost, message sizes
 	cargo run --release -p tv-bench -- --payments 1000
 
-.PHONY: help test demo crash-demo bench
+nitro-up: ## On the EC2 parent: build, start the enclave from ~/tv-enclave.eif and the bank under its PCR0, register
+	cargo build --release -p tv-bank -p tv-client -p tv-bench && ./scripts/nitro-up.sh
+
+nitro-bench: nitro-up ## On the EC2 parent: nitro-up, then the mock baseline and the Nitro run, saved to ~/bench-results
+	./scripts/nitro-bench.sh
+
+nitro-down: ## On the EC2 parent: stop the bank and terminate the enclave
+	./scripts/nitro-down.sh
+
+.PHONY: help test demo crash-demo bench nitro-up nitro-bench nitro-down
