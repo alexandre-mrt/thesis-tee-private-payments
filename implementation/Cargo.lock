@@ -1903,16 +1903,20 @@ name = "tv-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aws-nitro-enclaves-cose",
  "clap",
  "hex",
+ "openssl",
  "pt-tee",
  "serde",
+ "serde_bytes",
  "serde_json",
  "tokio",
  "tv-bank",
  "tv-client",
  "tv-core",
  "tv-enclave",
+ "x509-parser",
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod attest_cost;
 mod client;
 mod enclave;
 mod latency;
@@ -18,6 +19,7 @@ use std::process::Command;
 use anyhow::{Result, bail};
 use clap::Parser;
 
+use pt_tee::attestation::mock::is_mock;
 use tv_client::Trust;
 
 use crate::setup::{Loopback, Remote};
@@ -79,8 +81,7 @@ struct Args {
     allow_mock: bool,
     #[arg(
         long,
-        requires = "remote",
-        help = "Data directory of the running bank (its wallet funds the bench wallets)"
+        help = "Data directory of the running bank (its wallet funds --remote runs)"
     )]
     bank_data: Option<PathBuf>,
 }
@@ -216,6 +217,31 @@ async fn client_cost_bench(args: &Args, lb: &Loopback) -> Result<()> {
     print_percentiles("verify attestation bundle", &cost.verify);
     print_percentiles("seal payer opening", &cost.seal);
     print_percentiles("build offer (prepare_pay)", &cost.offer);
+    attest_cost_bench(&cost.doc, args.iterations)
+}
+
+fn attest_cost_bench(doc: &[u8], iterations: usize) -> Result<()> {
+    if is_mock(doc) {
+        return Ok(());
+    }
+    let cost = match attest_cost::attest_cost(doc, iterations) {
+        Ok(cost) => cost,
+        Err(err) => {
+            println!("== attestation check breakdown failed: {err:#}");
+            return Ok(());
+        }
+    };
+    println!(
+        "== attestation check breakdown ({} byte document, {} certificates)",
+        doc.len(),
+        cost.certificates
+    );
+    print_percentiles("COSE parse and payload decode", &cost.parse);
+    print_percentiles(
+        "certificate chain (parse and verify every link)",
+        &cost.chain,
+    );
+    print_percentiles("COSE ES384 signature under the leaf key", &cost.signature);
     Ok(())
 }
 

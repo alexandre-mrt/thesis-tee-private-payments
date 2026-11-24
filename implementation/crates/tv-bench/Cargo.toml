@@ -23,3 +23,9 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 hex.workspace = true
+aws-nitro-enclaves-cose.workspace = true
+x509-parser.workspace = true
+openssl.workspace = true
+
+[dev-dependencies]
+serde_bytes.workspace = true

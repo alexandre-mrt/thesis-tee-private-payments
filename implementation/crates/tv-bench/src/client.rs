@@ -20,6 +20,7 @@ use crate::setup::Loopback;
 const COST_FUNDING: u64 = 10;
 
 pub struct ClientCost {
+    pub doc: Vec<u8>,
     pub verify: Vec<Duration>,
     pub seal: Vec<Duration>,
     pub offer: Vec<Duration>,
@@ -31,6 +32,7 @@ pub async fn client_cost(lb: &Loopback, iterations: usize) -> Result<ClientCost>
     let request = wallet_payment::request(&mut bob, client, Some(1)).await?;
     let verifier = client.verifier();
     let mut cost = ClientCost {
+        doc: request.attestation.doc.clone(),
         verify: Vec::with_capacity(iterations),
         seal: Vec::with_capacity(iterations),
         offer: Vec::with_capacity(iterations),
