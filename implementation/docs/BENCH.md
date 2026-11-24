@@ -18,16 +18,19 @@ make bench                                   # cargo run --release -p tv-bench -
 git checkout 8ffabbe && make bench           # reproduces the "before" column (bench crate, unoptimized code)
 ```
 
-Against a bank that is already running (the Nitro deployment, where the enclave sits behind vsock and attests for real):
+Against the Nitro deployment (enclave behind vsock, real attestation):
 
 ```
-./target/release/tv-bench --payments 1000 --remote 127.0.0.1:7700 --bank-data ~/bank --pcr0 <PCR0>
-scripts/nitro-bench.sh    # checks the enclave runs in production mode with that PCR0, runs the local mock baseline and the remote run, saves both
 make nitro-bench          # on the EC2 parent: build, scripts/nitro-up.sh (enclave, bank, registration; skips what already runs), then scripts/nitro-bench.sh
 make nitro-down           # stop the bank and terminate the enclave
+scripts/tunnel-bench.sh ec2-user@<instance IP>   # on another machine: clients reach the bank through an SSH tunnel
 ```
 
-`--remote` skips the in-process sections and runs the latency, wallet flow, client cost and message size sections against that bank, then a settle throughput run with 1, cores and 4 x cores concurrent pairs over TCP. The bank's wallet in `--bank-data` funds the bench wallets, so do not run `tv-bank` wallet commands at the same time. `--allow-mock` replaces `--pcr0` for a local mock bank. `scripts/nitro-bench.sh` reads PCR0 from `~/eif.json` (the `nitro-cli build-enclave` output) unless `PCR0` is set, and writes `context.txt`, `enclave.json`, `mock.txt` and `nitro.txt` to `~/bench-results/<UTC time>/`. It points `TMPDIR` at `~/bench-tmp` (or `TV_BENCH_TMPDIR`), because `/tmp` is a tmpfs on Amazon Linux 2023: there an fsync costs nothing and the mock baseline's store and wallet figures would not be comparable with a bank writing to EBS.
+`scripts/nitro-bench.sh` checks that the enclave runs in production mode with the PCR0 in `~/eif.json` (or `PCR0`), then repeats three times (`TV_BENCH_RUNS`): the local mock baseline (`mock-N.txt`), the remote run against the bank (`nitro-N.txt`) and the direct enclave run (`direct-N.txt`), with `context.txt` and `enclave.json`, in `~/bench-results/<UTC time>/`. It points `TMPDIR` at `~/bench-tmp` (or `TV_BENCH_TMPDIR`), because `/tmp` is a tmpfs on Amazon Linux 2023: there an fsync costs nothing and the mock baseline's store and wallet figures would not be comparable with a bank writing to EBS.
+
+- `tv-bench --remote HOST:PORT --bank-data DIR --pcr0 HEX` (or `--allow-mock` for a local mock bank) skips the in-process sections and runs the latency, wallet flow, client cost and message size sections against that bank, then a settle throughput run with 1, `--pairs` and 4 x `--pairs` concurrent pairs over TCP. The bank wallet in `DIR` funds the bench wallets, so no `tv-bank` wallet command may run at the same time. With a real attestation document it also breaks the client's attestation check down into COSE parsing, the certificate chain and the COSE signature, the part that would remain per payment if a wallet cached the chain per enclave.
+- `tv-bench --enclave vsock://CID:PORT --bank-data DIR` calls the enclave directly, without the bank: a bare round trip (`Cancel` of an unknown key), an attestation, and a `Pay` check on states signed with the bank's state key from `DIR`, next to the same check in process on the host. The difference is what the TEE and its link add.
+- `scripts/tunnel-bench.sh` runs the clients on another machine so the bank, not the clients, sets the throughput (default `TV_BENCH_PAYMENTS=300`, `TV_BENCH_PAIRS=32`). It reads PCR0 from the instance, opens `ssh -L 17700:127.0.0.1:7700`, moves the instance's bank wallet to the laptop for the run (the instance copy is renamed `bank-wallet.json.on-laptop`), and copies it back on every exit, failure included; if that copy back fails it prints how to restore it by hand. Every call opens a new TCP connection, so each one also opens an SSH channel and pays the laptop-to-instance round trip.
 
 What each section measures:
 
